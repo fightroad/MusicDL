@@ -2,13 +2,18 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>MusicDL</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/img/logo.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="page-home">
   <header class="top">
-    <a class="brand" href="#search" data-view="search">MusicDL</a>
+    <a class="brand" href="#search" data-view="search">
+      <img class="brand-icon" src="/img/logo.svg" width="28" height="28" alt="" />
+      <span>MusicDL</span>
+    </a>
     <nav>
       <button type="button" id="dlQueueToggle" class="nav-link nav-queue" aria-expanded="false">
         下载队列
@@ -74,7 +79,6 @@
           <div class="actions">
             <button type="submit">导入</button>
           </div>
-          <p id="importStatus" class="status"></p>
         </form>
       </div>
     </section>
@@ -87,10 +91,10 @@
             <tr>
               <th class="col-order">顺序</th>
               <th>名称</th>
-              <th>版本</th>
-              <th>作者</th>
-              <th>状态</th>
-              <th>操作</th>
+              <th class="col-version">版本</th>
+              <th class="col-author">作者</th>
+              <th class="col-status">状态</th>
+              <th class="col-actions">操作</th>
             </tr>
           </thead>
           <tbody id="sourceBody"></tbody>
@@ -124,7 +128,7 @@
 
   <footer class="player">
     <div class="player-cover-wrap">
-      <img id="playerCover" class="player-cover" alt="" hidden />
+      <img id="playerCover" class="player-cover is-logo" src="/img/logo.svg" alt="" />
     </div>
     <div class="player-meta">
       <div id="nowPlaying" class="now-title">未在播放</div>

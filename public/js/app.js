@@ -105,6 +105,7 @@ function toast(message, { error = false, ms = 2400 } = {}) {
     toastEl.hidden = true
   }, ms)
 }
+window.toast = toast
 
 function escapeHtml(str) {
   return String(str)
@@ -113,6 +114,9 @@ function escapeHtml(str) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
 }
+
+window.api = api
+window.escapeHtml = escapeHtml
 
 function currentSource() {
   const id = Number(sourceSelect.value)
@@ -212,6 +216,7 @@ function renderRows(songs) {
           <div class="song-line">
             <span class="song-name">${escapeHtml(s.name)}</span>${qTag}${pTag}
           </div>
+          <div class="song-sub">${escapeHtml(s.artist || '-')}</div>
         </td>
         <td class="col-artist">${escapeHtml(s.artist || '-')}</td>
         <td class="col-album">${escapeHtml(s.album || '-')}</td>
@@ -296,21 +301,24 @@ function formatTime(sec) {
   return `${m}:${String(r).padStart(2, '0')}`
 }
 
+const PLAYER_LOGO = '/img/logo.svg'
+
 function setPlayerMeta(song, statusText) {
   nowPlaying.textContent = statusText || song?.name || '未在播放'
   nowArtist.textContent = song?.artist || (song ? '' : '选择歌曲后点击试听')
   if (song?.cover) {
+    playerCover.classList.remove('is-logo')
     playerCover.src = song.cover
-    playerCover.hidden = false
   } else {
-    playerCover.removeAttribute('src')
-    playerCover.hidden = true
+    playerCover.classList.add('is-logo')
+    playerCover.src = PLAYER_LOGO
   }
 }
 
 playerCover.addEventListener('error', () => {
-  playerCover.removeAttribute('src')
-  playerCover.hidden = true
+  if (playerCover.classList.contains('is-logo')) return
+  playerCover.classList.add('is-logo')
+  playerCover.src = PLAYER_LOGO
 })
 
 function syncPlayButton() {

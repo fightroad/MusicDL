@@ -1,23 +1,5 @@
-async function api(path, options = {}) {
-  const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
-  })
-  if (!res.ok) {
-    let msg = res.statusText
-    try {
-      const data = await res.json()
-      msg = data.detail || JSON.stringify(data)
-    } catch (_) {}
-    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
-  }
-  if (res.status === 204) return null
-  return res.json()
-}
-
 const form = document.getElementById('importForm')
 const body = document.getElementById('sourceBody')
-const statusEl = document.getElementById('importStatus')
 const fileInput = document.getElementById('scriptFile')
 const urlInput = document.getElementById('scriptUrl')
 
@@ -25,15 +7,6 @@ let sourcesList = []
 
 function clearForm() {
   form.reset()
-  statusEl.textContent = ''
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
 }
 
 function notifySearchSources() {
@@ -43,24 +16,25 @@ function notifySearchSources() {
 }
 
 function renderList() {
+  const escapeHtml = window.escapeHtml
   body.innerHTML = sourcesList
     .map((s, idx) => {
       const desc = s.description
-        ? `<div class="muted">${escapeHtml(s.description)}</div>`
+        ? `<div class="muted source-desc">${escapeHtml(s.description)}</div>`
         : ''
       return `<tr>
       <td class="col-order">
         <button type="button" class="small ghost order-btn" data-move="${s.id}" data-dir="up" ${idx === 0 ? 'disabled' : ''} title="上移">↑</button>
         <button type="button" class="small ghost order-btn" data-move="${s.id}" data-dir="down" ${idx === sourcesList.length - 1 ? 'disabled' : ''} title="下移">↓</button>
       </td>
-      <td>
-        <div>${escapeHtml(s.name)}</div>
+      <td class="col-name">
+        <div class="source-name">${escapeHtml(s.name)}</div>
         ${desc}
       </td>
-      <td>${escapeHtml(s.version || '-')}</td>
-      <td>${escapeHtml(s.author || '-')}</td>
-      <td><span class="source-status ${s.enabled ? 'is-on' : 'is-off'}">${s.enabled ? '启用' : '禁用'}</span></td>
-      <td>
+      <td class="col-version">${escapeHtml(s.version || '-')}</td>
+      <td class="col-author">${escapeHtml(s.author || '-')}</td>
+      <td class="col-status"><span class="source-status ${s.enabled ? 'is-on' : 'is-off'}">${s.enabled ? '启用' : '禁用'}</span></td>
+      <td class="col-actions">
         <button class="small" data-toggle="${s.id}" data-enabled="${s.enabled ? 1 : 0}">
           ${s.enabled ? '禁用' : '启用'}
         </button>
@@ -72,7 +46,7 @@ function renderList() {
 }
 
 async function loadList() {
-  sourcesList = await api('/api/sources')
+  sourcesList = await window.api('/api/sources')
   renderList()
 }
 
@@ -83,7 +57,7 @@ async function moveSource(id, dir) {
   if (j < 0 || j >= sourcesList.length) return
   const ids = sourcesList.map((s) => s.id)
   ;[ids[idx], ids[j]] = [ids[j], ids[idx]]
-  sourcesList = await api('/api/sources/reorder', {
+  sourcesList = await window.api('/api/sources/reorder', {
     method: 'PUT',
     body: JSON.stringify({ ids }),
   })
@@ -93,7 +67,7 @@ async function moveSource(id, dir) {
 
 window.refreshSourceList = () =>
   loadList().catch((err) => {
-    statusEl.textContent = err.message
+    window.toast(err.message, { error: true })
   })
 
 form.addEventListener('submit', async (e) => {
@@ -103,21 +77,20 @@ form.addEventListener('submit', async (e) => {
   let script = null
   if (file) script = await file.text()
   if (!url && !script) {
-    statusEl.textContent = '请填写脚本 URL，或选择本地 .js 文件'
+    window.toast('请填写脚本 URL，或选择本地 .js 文件', { error: true })
     return
   }
-  statusEl.textContent = '导入中…'
   try {
-    const item = await api('/api/sources/import', {
+    const item = await window.api('/api/sources/import', {
       method: 'POST',
       body: JSON.stringify({ url: url || null, script: script || null }),
     })
     clearForm()
-    statusEl.textContent = `已导入：${item.name}`
+    window.toast(`已导入：${item.name}`)
     await loadList()
     notifySearchSources()
   } catch (err) {
-    statusEl.textContent = `导入失败: ${err.message}`
+    window.toast(`导入失败: ${err.message}`, { error: true, ms: 3200 })
   }
 })
 
@@ -129,34 +102,34 @@ body.addEventListener('click', async (e) => {
     try {
       await moveSource(moveBtn.dataset.move, moveBtn.dataset.dir)
     } catch (err) {
-      alert(err.message)
+      window.toast(err.message, { error: true })
     }
     return
   }
   if (toggleBtn) {
     try {
-      await api(`/api/sources/${toggleBtn.dataset.toggle}`, {
+      await window.api(`/api/sources/${toggleBtn.dataset.toggle}`, {
         method: 'PATCH',
         body: JSON.stringify({ enabled: toggleBtn.dataset.enabled !== '1' }),
       })
       await loadList()
       notifySearchSources()
     } catch (err) {
-      alert(err.message)
+      window.toast(err.message, { error: true })
     }
   }
   if (delBtn) {
     if (!confirm('确认删除该音源？')) return
     try {
-      await api(`/api/sources/${delBtn.dataset.del}`, { method: 'DELETE' })
+      await window.api(`/api/sources/${delBtn.dataset.del}`, { method: 'DELETE' })
       await loadList()
       notifySearchSources()
     } catch (err) {
-      alert(err.message)
+      window.toast(err.message, { error: true })
     }
   }
 })
 
 loadList().catch((err) => {
-  statusEl.textContent = err.message
+  window.toast(err.message, { error: true })
 })
