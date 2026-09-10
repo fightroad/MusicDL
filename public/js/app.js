@@ -257,14 +257,21 @@ async function doSearch({ resetPage = false } = {}) {
   }
 }
 
+/** Preview: lowest available quality (prefer 128k when present). */
+function previewQuality(song) {
+  const qs = sourceQualities(song)
+  return qs[0] || '128k'
+}
+
 async function resolveUrl(song) {
+  const quality = previewQuality(song)
   return api('/api/music/url', {
     method: 'POST',
     body: JSON.stringify({
       source_id: song.source_id,
       song_id: song.id,
       platform: song.platform || 'kw',
-      quality: '128k',
+      quality,
       extra: { ...song.extra, name: song.name, artist: song.artist },
     }),
   })
