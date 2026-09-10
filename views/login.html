@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>登录 · MusicDL</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/img/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body class="page-login">
+  <main class="login-shell">
+    <form id="loginForm" class="login-card" autocomplete="current-password">
+      <header class="login-brand">
+        <img class="login-logo" src="/img/logo.svg" width="48" height="48" alt="" />
+        <h1>MusicDL</h1>
+        <p class="login-sub">输入访问密码继续</p>
+      </header>
+      <label class="login-field">
+        <input id="password" type="password" name="password" required autofocus enterkeyhint="go" placeholder="访问密码" aria-label="访问密码" />
+      </label>
+      <button type="submit" class="login-submit">登录</button>
+      <p id="loginStatus" class="login-status" hidden></p>
+    </form>
+  </main>
+  <script src="/js/login.js"></script>
+</body>
+</html>

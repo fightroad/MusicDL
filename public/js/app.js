@@ -3,6 +3,10 @@ async function api(path, options = {}) {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     ...options,
   })
+  if (res.status === 401 && !String(path).startsWith('/api/login')) {
+    location.href = '/login'
+    throw new Error('未登录')
+  }
   if (!res.ok) {
     let msg = res.statusText
     try {
@@ -722,6 +726,26 @@ btnSearch.addEventListener('click', () => doSearch({ resetPage: true }))
 keywordInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') doSearch({ resetPage: true })
 })
+
+const btnLogout = document.getElementById('btnLogout')
+
+async function initAuthUi() {
+  try {
+    const status = await api('/api/auth/status')
+    if (status?.enabled) {
+      btnLogout.hidden = false
+    }
+  } catch (_) {}
+}
+
+btnLogout.addEventListener('click', async () => {
+  try {
+    await api('/api/logout', { method: 'POST' })
+  } catch (_) {}
+  location.href = '/login'
+})
+
+initAuthUi()
 
 loadSources().catch((err) => {
   toast(`加载音源失败: ${err.message}`, { error: true })

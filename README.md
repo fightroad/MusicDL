@@ -37,6 +37,35 @@ npm start
 
 开发热重载：`npm run dev`
 
+### 访问密码（可选）
+
+局域网或公网暴露时，可加单密码门禁：
+
+```bash
+# Windows PowerShell
+$env:AUTH_PASSWORD="你的密码"
+$env:HOST="0.0.0.0"
+npm start
+```
+
+```bash
+# Linux / macOS
+AUTH_PASSWORD='你的密码' HOST=0.0.0.0 npm start
+```
+
+- 未设置 `AUTH_PASSWORD` 时不启用登录（适合本机使用）
+- 登录态为 HttpOnly cookie，默认约 7 天
+
+Docker 示例：
+
+```bash
+docker run -d --name musicdl \
+  -p 8000:8000 \
+  -e AUTH_PASSWORD=你的密码 \
+  -v ./data:/app/data \
+  ghcr.io/fightroad/musicdl:latest
+```
+
 ## Docker
 
 直接使用已构建镜像：
@@ -81,3 +110,4 @@ docker run -d -p 8000:8000 -v ./data:/app/data musicdl:local
 - 搜索与歌词由本工具内置；取链依赖你导入的洛雪音源脚本
 - 音源配置保存在 `data/config/sources.json`
 - 仅监听本机时默认 `127.0.0.1`；容器内默认 `HOST=0.0.0.0`
+- 可选 `AUTH_PASSWORD` 开启单密码登录（见上文）
