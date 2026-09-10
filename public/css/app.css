@@ -320,7 +320,7 @@ nav .nav-logout:hover {
   background: #1c232c;
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 22px 20px 18px;
+  padding: 20px 18px 16px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
 }
 .modal-close {
@@ -374,10 +374,13 @@ nav .nav-logout:hover {
   cursor: wait;
 }
 .modal-status {
-  min-height: 1.2em;
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   color: var(--muted);
   font-size: 0.9rem;
+  line-height: 1.4;
+}
+.modal-status:empty {
+  display: none;
 }
 input, select, button, textarea {
   font: inherit;
