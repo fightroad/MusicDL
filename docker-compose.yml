@@ -1,7 +1,6 @@
 services:
   musicdl:
-    build: .
-    image: musicdl:latest
+    image: ghcr.io/fightroad/musicdl:latest
     ports:
       - "8000:8000"
     environment:

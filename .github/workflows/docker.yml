@@ -2,6 +2,9 @@ name: Docker
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -40,7 +43,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest
-            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -48,6 +51,8 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
+          provenance: false
+          sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
