@@ -7,6 +7,7 @@ import musicRouter from './routes/music.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.PORT) || 8000
+const HOST = process.env.HOST || '127.0.0.1'
 
 const app = express()
 app.use(express.json({ limit: '5mb' }))
@@ -28,6 +29,6 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ detail: err.message || 'Internal Server Error' })
 })
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`MusicDL running at http://127.0.0.1:${PORT}`)
+app.listen(PORT, HOST, () => {
+  console.log(`MusicDL running at http://${HOST}:${PORT}`)
 })
