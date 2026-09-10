@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MusicDL</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body class="page-home">
+  <header class="top">
+    <a class="brand" href="#search" data-view="search">MusicDL</a>
+    <nav>
+      <a href="#search" data-view="search" class="nav-link active">音乐搜索</a>
+      <a href="#sources" data-view="sources" class="nav-link">音源管理</a>
+    </nav>
+  </header>
+
+  <main id="viewSearch" class="wrap view-panel">
+    <section class="search-bar">
+      <select id="sourceSelect"></select>
+      <input id="keyword" type="search" placeholder="输入歌名 / 歌手" />
+      <button id="btnSearch" type="button">搜索</button>
+    </section>
+
+    <div id="platformTabs" class="platform-tabs" hidden></div>
+
+    <div class="results-shell">
+      <div class="table-wrap">
+        <table>
+          <thead>
+          <tr>
+            <th class="col-idx">#</th>
+            <th class="col-song">歌曲名</th>
+            <th class="col-artist">艺术家</th>
+            <th class="col-album">专辑名</th>
+            <th class="col-duration">时长</th>
+            <th class="col-actions">操作</th>
+          </tr>
+          </thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+      </div>
+
+      <div id="pager" class="pager" hidden>
+        <div class="pager-nav">
+          <button type="button" id="btnPrev" class="ghost">上一页</button>
+          <span id="pageInfo" class="page-info">1 / 1</span>
+          <button type="button" id="btnNext" class="ghost">下一页</button>
+        </div>
+        <select id="pageSize" title="每页条数">
+          <option value="20">20 条/页</option>
+          <option value="30">30 条/页</option>
+          <option value="50">50 条/页</option>
+        </select>
+      </div>
+    </div>
+  </main>
+
+  <main id="viewSources" class="wrap view-panel view-sources" hidden>
+    <section class="import-section">
+      <h1>导入音源</h1>
+      <div class="card-form">
+        <form id="importForm" class="import-form">
+          <label>在线导入（脚本 URL）
+            <input id="scriptUrl" type="url" placeholder="https://example.com/xxx.js" />
+          </label>
+          <label>本地导入
+            <input id="scriptFile" type="file" accept=".js,text/javascript,text/plain" />
+          </label>
+          <div class="actions">
+            <button type="submit">导入</button>
+          </div>
+          <p id="importStatus" class="status"></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="sources-list">
+      <h2>已导入音源</h2>
+      <div class="table-wrap sources-table">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-order">顺序</th>
+              <th>名称</th>
+              <th>版本</th>
+              <th>作者</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="sourceBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="dlModal" class="modal" hidden>
+    <div class="modal-card">
+      <button type="button" class="modal-close" id="dlClose" aria-label="关闭">×</button>
+      <div class="modal-title" id="dlTitle">歌曲</div>
+      <div class="modal-sub" id="dlArtist">歌手</div>
+      <div class="modal-actions" id="dlQualities"></div>
+      <p class="modal-status" id="dlStatus"></p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <footer class="player">
+    <div class="player-cover-wrap">
+      <img id="playerCover" class="player-cover" alt="" hidden />
+    </div>
+    <div class="player-meta">
+      <div id="nowPlaying" class="now-title">未在播放</div>
+      <div id="nowArtist" class="now-artist">选择歌曲后点击试听</div>
+    </div>
+    <button type="button" id="btnPlayPause" class="player-btn" title="播放/暂停" disabled>▶</button>
+    <div class="player-progress">
+      <span id="timeCurrent" class="time">0:00</span>
+      <input id="seekBar" class="seek" type="range" min="0" max="1000" value="0" step="1" disabled />
+      <span id="timeTotal" class="time">0:00</span>
+    </div>
+    <audio id="audio" preload="auto"></audio>
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/sources.js"></script>
+  <script src="/js/nav.js"></script>
+</body>
+</html>
