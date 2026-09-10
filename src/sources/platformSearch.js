@@ -4,6 +4,7 @@
  */
 
 import { createHash } from 'node:crypto'
+import { eapiRequest } from './wyEapi.js'
 
 const PLATFORM_META = {
   kw: { key: 'kw', name: '小蜗音乐', short: '小蜗' },
@@ -99,6 +100,28 @@ function parseKwQualities(minfo) {
   return { qualitys, sizes }
 }
 
+/** LX decodeName — HTML entities in titles/artists (e.g. &amp; → &). */
+function decodeName(str) {
+  if (str == null || str === '') return ''
+  const s = String(str)
+  if (!s.includes('&')) return s
+  return s
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, n) => {
+      const code = Number(n)
+      return Number.isFinite(code) ? String.fromCharCode(code) : _
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => {
+      const code = parseInt(h, 16)
+      return Number.isFinite(code) ? String.fromCharCode(code) : _
+    })
+}
+
 /** Format byte length like LX sizeFormate → e.g. 4.55MB */
 function sizeFormate(bytes) {
   const n = Number(bytes)
@@ -121,6 +144,61 @@ function displaySize(raw) {
   return s
 }
 
+/** Build LX musicSdk types / _types from [{ type, size?, hash? }]. */
+function buildLxTypes(entries = []) {
+  const types = []
+  const _types = {}
+  const sizes = {}
+  for (const e of entries) {
+    if (!e?.type) continue
+    const type = e.type
+    const size = e.size ? displaySize(e.size) || String(e.size) : null
+    const row = e.hash ? { type, size, hash: e.hash } : { type, size }
+    types.push(row)
+    _types[type] = e.hash ? { size, hash: e.hash } : { size }
+    if (size) sizes[type] = size
+  }
+  return { types, _types, sizes, qualityKeys: types.map((t) => t.type) }
+}
+
+/** LX list-item fields scripts expect on musicInfo (+ aliases for older scripts). */
+function lxExtra(platform, fields, types, _types) {
+  return {
+    source: platform,
+    types: types || [],
+    _types: _types || {},
+    typeUrl: {},
+    // older MusicDL / some scripts used qualitys/_qualitys
+    qualitys: types || [],
+    _qualitys: _types || {},
+    ...fields,
+  }
+}
+
+function filterLxTypes(extra, allowedKeys) {
+  if (!extra || typeof extra !== 'object') return extra || {}
+  const want = new Set((allowedKeys || []).map(normalizeQualityKey))
+  const types = (extra.types || extra.qualitys || []).filter(
+    (t) => t && want.has(normalizeQualityKey(t.type || t))
+  )
+  const _types = {}
+  for (const key of allowedKeys || []) {
+    const src =
+      extra._types?.[key] ||
+      extra._types?.[normalizeQualityKey(key)] ||
+      extra._qualitys?.[key] ||
+      extra._qualitys?.[normalizeQualityKey(key)]
+    if (src) _types[key] = src
+  }
+  return {
+    ...extra,
+    types,
+    _types,
+    qualitys: types,
+    _qualitys: _types,
+  }
+}
+
 function song({ id, name, artist, album, duration, cover, platform, qualitys, qualitySizes, extra }) {
   const qs = (qualitys || []).filter(Boolean)
   const uniq = [...new Set(qs)]
@@ -133,6 +211,7 @@ function song({ id, name, artist, album, duration, cover, platform, qualitys, qu
       if (shown) sizes[key] = shown
     }
   }
+  const baseExtra = extra || {}
   return {
     id: String(id),
     name: name || '未知',
@@ -146,7 +225,14 @@ function song({ id, name, artist, album, duration, cover, platform, qualitys, qu
     qualitySizes: sizes,
     quality: q,
     quality_tag: qualityTag(q),
-    extra: extra || {},
+    extra: {
+      ...baseExtra,
+      name: baseExtra.name || name || '未知',
+      singer: baseExtra.singer || artist || '',
+      albumName: baseExtra.albumName || album || '',
+      img: baseExtra.img || cover || null,
+      source: baseExtra.source || platform,
+    },
   }
 }
 
@@ -183,6 +269,7 @@ export function decorateListQualities(list, sourceQualitys, platformQualitys = n
       qualitySizes,
       quality: q,
       quality_tag: qualityTag(q),
+      extra: filterLxTypes(item.extra, uniq),
     }
   })
 }
@@ -195,6 +282,7 @@ function matchAllowedQuality(songQ, allowedSet) {
   return hit || null
 }
 
+/** Align with LX kw musicSearch params + decodeName on titles. */
 async function searchKw(keyword, page, limit) {
   const url =
     'https://search.kuwo.cn/r.s?' +
@@ -204,8 +292,9 @@ async function searchKw(keyword, page, limit) {
       pn: String(page - 1),
       rn: String(limit),
       uid: '794762570',
-      ver: 'kwplayer_ar_99.99.99.99',
+      ver: 'kwplayer_ar_9.2.2.1',
       vipver: '1',
+      show_copyright_off: '1',
       newver: '1',
       ft: 'music',
       cluster: '0',
@@ -214,6 +303,7 @@ async function searchKw(keyword, page, limit) {
       rformat: 'json',
       vermerge: '1',
       mobi: '1',
+      issubtitle: '1',
     }).toString()
   const data = await fetchJson(url)
   const list = data.abslist || []
@@ -221,94 +311,131 @@ async function searchKw(keyword, page, limit) {
     total: Number(data.TOTAL || data.total || list.length),
     list: list.map((item) => {
       const { qualitys, sizes } = parseKwQualities(item.N_MINFO || item.MINFO)
+      const keys = qualitys.length ? qualitys : ['128k']
+      const entries = keys.map((type) => ({ type, size: sizes[type] || null }))
+      const { types, _types, sizes: typeSizes } = buildLxTypes(entries)
+      const songmid = String(item.MUSICRID?.replace('MUSIC_', '') || item.DC_TARGETID || '')
+      const name = decodeName(item.SONGNAME || item.NAME || '')
+      const artist = decodeName(item.ARTIST || item.artist || '')
+      const album = decodeName(item.ALBUM || item.album || '')
       return song({
-        id: item.MUSICRID?.replace('MUSIC_', '') || item.DC_TARGETID || item.rid,
-        name: item.NAME || item.SONGNAME,
-        artist: item.ARTIST || item.artist,
-        album: item.ALBUM || item.album,
+        id: songmid || item.rid,
+        name,
+        artist,
+        album,
         duration: Number(item.DURATION || item.duration || 0),
         cover: item.web_albumpic_short
           ? `https://img2.kuwo.cn/star/albumcover/${item.web_albumpic_short}`
           : null,
         platform: 'kw',
-        qualitys: qualitys.length ? qualitys : ['128k'],
-        qualitySizes: sizes,
-        extra: {
-          songmid: String(item.MUSICRID?.replace('MUSIC_', '') || item.DC_TARGETID || ''),
-          hash: item.N_MINFO || '',
-          albumId: item.ALBUMID,
-        },
+        qualitys: keys,
+        qualitySizes: typeSizes,
+        extra: lxExtra(
+          'kw',
+          {
+            songmid,
+            albumId: decodeName(item.ALBUMID || ''),
+          },
+          types,
+          _types
+        ),
       })
     }),
   }
 }
 
 async function searchWy(keyword, page, limit) {
-  const offset = (page - 1) * limit
-  const url = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(keyword)}&type=1&limit=${limit}&offset=${offset}`
-  const data = await fetchJson(url, {
-    headers: { Referer: 'https://music.163.com/' },
+  const body = await eapiRequest('/api/search/song/list/page', {
+    keyword,
+    needCorrect: '1',
+    channel: 'typing',
+    offset: limit * (page - 1),
+    scene: 'normal',
+    total: page == 1,
+    limit,
   })
-  const result = data.result || {}
-  const list = result.songs || []
-  return {
-    total: Number(result.songCount || list.length),
-    list: list.map((item) => {
-      // Align with LX wy: flac24bit only if maxBrLevel === 'hires'; maxbr fall-through bands.
-      const qualitys = []
-      const sizes = {}
-      const privilege = item.privilege || {}
-      if (privilege.maxBrLevel === 'hires') {
-        qualitys.push('flac24bit')
-        if (item.hr?.size) sizes.flac24bit = sizeFormate(item.hr.size)
-      }
-      const maxbr = Number(privilege.maxbr ?? item.maxbr ?? 0)
-      if (maxbr >= 999000) {
-        qualitys.push('flac')
-        if (item.sq?.size) sizes.flac = sizeFormate(item.sq.size)
-      }
-      if (maxbr >= 320000) {
-        qualitys.push('320k')
-        if (item.h?.size) sizes['320k'] = sizeFormate(item.h.size)
-      }
-      if (maxbr >= 128000 || maxbr >= 192000) {
-        qualitys.push('128k')
-        const low = item.l || item.m
-        if (low?.size) sizes['128k'] = sizeFormate(low.size)
-      }
-      // cloudsearch sometimes omits privilege — fall back to presence of size objects (not hr alone)
-      if (!qualitys.length) {
-        if (item.sq) {
-          qualitys.push('flac')
-          if (item.sq.size) sizes.flac = sizeFormate(item.sq.size)
-        }
-        if (item.h) {
-          qualitys.push('320k')
-          if (item.h.size) sizes['320k'] = sizeFormate(item.h.size)
-        }
-        if (item.m || item.l) {
-          qualitys.push('128k')
-          const low = item.l || item.m
-          if (low?.size) sizes['128k'] = sizeFormate(low.size)
-        }
-      }
-      return song({
+  if (!body || body.code !== 200) {
+    throw new Error(body?.message || body?.msg || `网易搜索失败(${body?.code ?? 'unknown'})`)
+  }
+  const resources = body.data?.resources || []
+  const list = []
+  for (const row of resources) {
+    const item = row?.baseInfo?.simpleSongData
+    if (!item?.id) continue
+    const privilege = item.privilege || {}
+    const entries = []
+    // Align with LX wy handleResult (switch fall-through on maxbr)
+    if (privilege.maxBrLevel === 'hires') {
+      entries.push({
+        type: 'flac24bit',
+        size: item.hr?.size ? sizeFormate(item.hr.size) : null,
+      })
+    }
+    switch (Number(privilege.maxbr ?? 0)) {
+      case 999000:
+        entries.push({
+          type: 'flac',
+          size: item.sq?.size ? sizeFormate(item.sq.size) : null,
+        })
+      // falls through
+      case 320000:
+        entries.push({
+          type: '320k',
+          size: item.h?.size ? sizeFormate(item.h.size) : null,
+        })
+      // falls through
+      case 192000:
+      case 128000:
+        entries.push({
+          type: '128k',
+          size: item.l?.size ? sizeFormate(item.l.size) : null,
+        })
+        break
+      default:
+        break
+    }
+    const seenQ = new Set()
+    const uniqEntries = []
+    for (const e of entries) {
+      if (seenQ.has(e.type)) continue
+      seenQ.add(e.type)
+      uniqEntries.push(e)
+    }
+    if (!uniqEntries.length) {
+      uniqEntries.push({ type: '128k', size: null })
+    }
+    const { types, _types, sizes, qualityKeys } = buildLxTypes(uniqEntries)
+    const artists = (item.ar || []).map((a) => a.name).filter(Boolean).join('、')
+    list.push(
+      song({
         id: item.id,
         name: item.name,
-        artist: (item.ar || item.artists || []).map((a) => a.name).join(' / '),
-        album: item.al?.name || item.album?.name || '',
-        duration: Math.round((item.dt || item.duration || 0) / 1000),
-        cover: item.al?.picUrl || item.album?.picUrl || null,
+        artist: artists,
+        album: item.al?.name || '',
+        duration: Math.round((item.dt || 0) / 1000),
+        cover: item.al?.picUrl || null,
         platform: 'wy',
-        qualitys: qualitys.length ? qualitys : ['128k'],
+        qualitys: qualityKeys,
         qualitySizes: sizes,
-        extra: { songmid: String(item.id) },
+        extra: lxExtra(
+          'wy',
+          {
+            songmid: item.id,
+            albumId: item.al?.id,
+          },
+          types,
+          _types
+        ),
       })
-    }),
+    )
+  }
+  return {
+    total: Number(body.data?.totalCount || list.length),
+    list,
   }
 }
 
-/** LX-style kg quality maps (scripts often pick hash via _qualitys[type].hash). */
+/** LX-style kg quality maps (types/_types with hash). */
 function buildKgQualityInfo(item) {
   // Align with LX kg filterData: only ResFileSize/ResFileHash for flac24bit (not HiRes*).
   const pairs = [
@@ -317,25 +444,21 @@ function buildKgQualityInfo(item) {
     ['flac', item.SQFileHash, item.SQFileSize],
     ['flac24bit', item.ResFileHash, item.ResFileSize],
   ]
-  const qualityKeys = []
-  const qualitys = []
-  const _qualitys = {}
-  const sizes = {}
+  const entries = []
   for (const [type, hash, fileSize] of pairs) {
     if (!hash) continue
     if (fileSize === 0) continue
-    qualityKeys.push(type)
-    const size = fileSize ? sizeFormate(fileSize) : ''
-    qualitys.push({ type, size: size || null, hash })
-    _qualitys[type] = { size: size || null, hash }
-    if (size) sizes[type] = size
+    entries.push({
+      type,
+      size: fileSize ? sizeFormate(fileSize) : null,
+      hash,
+    })
   }
-  if (!qualityKeys.length && item.FileHash) {
-    qualityKeys.push('128k')
-    qualitys.push({ type: '128k', size: null, hash: item.FileHash })
-    _qualitys['128k'] = { size: null, hash: item.FileHash }
+  if (!entries.length && item.FileHash) {
+    entries.push({ type: '128k', size: null, hash: item.FileHash })
   }
-  return { qualityKeys, qualitys, _qualitys, sizes }
+  const built = buildLxTypes(entries)
+  return built
 }
 
 /** Align with LX kg musicSearch: songsearch.kugou.com/song_search_v2 */
@@ -377,10 +500,11 @@ async function searchKg(keyword, page, limit) {
   return {
     total: Number(data.data?.total || rows.length),
     list: rows.map((item) => {
-      const { qualityKeys, qualitys, _qualitys, sizes } = buildKgQualityInfo(item)
+      const { types, _types, sizes, qualityKeys } = buildKgQualityInfo(item)
       const singers = Array.isArray(item.Singers)
         ? item.Singers.map((s) => s.name).filter(Boolean).join('、')
         : item.SingerName
+      const songmid = item.Audioid || item.FileHash || item.EMixSongID
       return song({
         id: item.FileHash || item.EMixSongID || item.Audioid || item.ID,
         name: item.SongName || item.OriSongName,
@@ -391,14 +515,17 @@ async function searchKg(keyword, page, limit) {
         platform: 'kg',
         qualitys: qualityKeys.length ? qualityKeys : ['128k'],
         qualitySizes: sizes,
-        extra: {
-          songmid: item.Audioid || item.FileHash || item.EMixSongID,
-          hash: item.FileHash,
-          albumId: item.AlbumID,
-          albumAudioId: item.AlbumAudioId || item.AudioId || item.Audioid || undefined,
-          qualitys,
-          _qualitys,
-        },
+        extra: lxExtra(
+          'kg',
+          {
+            songmid,
+            hash: item.FileHash,
+            albumId: item.AlbumID,
+            albumAudioId: item.AlbumAudioId || item.AudioId || item.Audioid || undefined,
+          },
+          types,
+          _types
+        ),
       })
     }),
   }
@@ -414,33 +541,32 @@ function mgCreateSignature(time, str) {
 }
 
 function parseMgFormats(audioFormats = []) {
-  const qualitys = []
-  const sizes = {}
+  const entries = []
   for (const type of audioFormats || []) {
-    const size = sizeFormate(type.asize ?? type.isize ?? type.size ?? type.androidSize)
+    const size = sizeFormate(type.asize ?? type.isize ?? type.size ?? type.androidSize) || null
     switch (type.formatType) {
       case 'PQ':
-        qualitys.push('128k')
-        if (size) sizes['128k'] = size
+        entries.push({ type: '128k', size })
         break
       case 'HQ':
-        qualitys.push('320k')
-        if (size) sizes['320k'] = size
+        entries.push({ type: '320k', size })
         break
       case 'SQ':
-        qualitys.push('flac')
-        if (size) sizes.flac = size
+        entries.push({ type: 'flac', size })
         break
       case 'ZQ24':
         // LX mg only maps ZQ24 → flac24bit (not ZQ)
-        qualitys.push('flac24bit')
-        if (size) sizes.flac24bit = size
+        entries.push({ type: 'flac24bit', size })
         break
       default:
         break
     }
   }
-  return { qualitys: [...new Set(qualitys)], sizes }
+  const built = buildLxTypes(entries)
+  if (!built.qualityKeys.length) {
+    return buildLxTypes([{ type: '128k', size: null }])
+  }
+  return built
 }
 
 /** Align with LX mg musicSearch: jadeite.migu.cn signed v3 searchAll */
@@ -487,7 +613,7 @@ async function searchMg(keyword, page, limit) {
   return {
     total: Number(songResultData.totalCount || rows.length),
     list: rows.map((item) => {
-      const { qualitys, sizes } = parseMgFormats(item.audioFormats)
+      const { types, _types, sizes, qualityKeys } = parseMgFormats(item.audioFormats)
       let img = item.img3 || item.img2 || item.img1 || null
       if (img && !/^https?:/i.test(img)) img = `http://d.musicapp.migu.cn${img}`
       const artists = Array.isArray(item.singerList)
@@ -501,41 +627,46 @@ async function searchMg(keyword, page, limit) {
         duration: Number(item.duration || 0),
         cover: img,
         platform: 'mg',
-        qualitys: qualitys.length ? qualitys : ['128k'],
+        qualitys: qualityKeys,
         qualitySizes: sizes,
-        extra: {
-          songmid: item.songId || item.copyrightId,
-          copyrightId: item.copyrightId,
-          contentId: item.contentId || item.copyrightId,
-          albumId: item.albumId,
-        },
+        extra: lxExtra(
+          'mg',
+          {
+            songmid: item.songId || item.copyrightId,
+            copyrightId: item.copyrightId,
+            contentId: item.contentId || item.copyrightId,
+            albumId: item.albumId,
+            lrcUrl: item.lrcUrl || item.lyricUrl || undefined,
+            mrcUrl: item.mrcUrl || item.mrcurl || undefined,
+            trcUrl: item.trcUrl || undefined,
+          },
+          types,
+          _types
+        ),
       })
     }),
   }
 }
 
 function parseTxQualities(file = {}) {
-  const qualitys = []
-  const sizes = {}
-  const size128 = file.size_128mp3 || file.size_96aac || file.size_48aac
-  if (size128 > 0) {
-    qualitys.push('128k')
-    sizes['128k'] = sizeFormate(size128)
+  const entries = []
+  if (file.size_128mp3 != 0 && file.size_128mp3) {
+    entries.push({ type: '128k', size: sizeFormate(file.size_128mp3) })
   }
-  if (file.size_320mp3 > 0) {
-    qualitys.push('320k')
-    sizes['320k'] = sizeFormate(file.size_320mp3)
+  if (file.size_320mp3 !== 0 && file.size_320mp3) {
+    entries.push({ type: '320k', size: sizeFormate(file.size_320mp3) })
   }
-  const lossless = file.size_flac || file.size_ape
-  if (lossless > 0) {
-    qualitys.push('flac')
-    sizes.flac = sizeFormate(lossless)
+  if (file.size_flac !== 0 && file.size_flac) {
+    entries.push({ type: 'flac', size: sizeFormate(file.size_flac) })
   }
-  if (file.size_hires > 0) {
-    qualitys.push('flac24bit')
-    sizes.flac24bit = sizeFormate(file.size_hires)
+  if (file.size_hires !== 0 && file.size_hires) {
+    entries.push({ type: 'flac24bit', size: sizeFormate(file.size_hires) })
   }
-  return { qualitys: qualitys.length ? qualitys : ['128k'], sizes }
+  const built = buildLxTypes(entries)
+  if (!built.qualityKeys.length) {
+    return buildLxTypes([{ type: '128k', size: null }])
+  }
+  return built
 }
 
 function normalizeTxSongList(itemSong) {
@@ -547,7 +678,47 @@ function normalizeTxSongList(itemSong) {
   )
 }
 
-/** QQ / 小秋 — 优先移动端（UA 需带 QQMusic），失败再试桌面端 */
+function mapTxSongItem(item) {
+  if (!item?.file?.media_mid) return null
+  const { types, _types, sizes, qualityKeys } = parseTxQualities(item.file || {})
+  const albumMid = item.album?.mid || ''
+  const albumId = albumMid
+  const songmid = item.mid || String(item.id)
+  const artists = Array.isArray(item.singer)
+    ? item.singer.map((s) => s.name).filter(Boolean).join(' / ')
+    : String(item.singer || item.author || '')
+  const cover =
+    !albumId || albumId === '空'
+      ? item.singer?.length
+        ? `https://y.gtimg.cn/music/photo_new/T001R500x500M000${item.singer[0].mid}.jpg`
+        : null
+      : `https://y.gtimg.cn/music/photo_new/T002R500x500M000${albumId}.jpg`
+  return song({
+    id: songmid,
+    name: (item.title || item.name || '').replace(/<\/?em>/gi, ''),
+    artist: artists.replace(/<\/?em>/gi, ''),
+    album: (item.album?.name || '').replace(/<\/?em>/gi, ''),
+    duration: Number(item.interval) || 0,
+    cover,
+    platform: 'tx',
+    qualitys: qualityKeys,
+    qualitySizes: sizes,
+    extra: lxExtra(
+      'tx',
+      {
+        songmid,
+        songId: item.id,
+        strMediaMid: item.file.media_mid,
+        albumMid,
+        albumId,
+      },
+      types,
+      _types
+    ),
+  })
+}
+
+/** QQ / 小秋 — musicu.fcg (unsigned); keep LX list fields for musicUrl scripts. */
 async function searchTx(keyword, page, limit) {
   const attempts = [
     {
@@ -614,7 +785,9 @@ async function searchTx(keyword, page, limit) {
       },
       pick: (data) => data.req_0,
       songs: (block) =>
-        normalizeTxSongList(block?.data?.body?.song || block?.data?.body?.item_song),
+        normalizeTxSongList(
+          block?.data?.body?.item_song || block?.data?.body?.song?.list
+        ),
       total: (block, list) =>
         Number(
           block?.data?.body?.song?.totalnum ||
@@ -633,53 +806,16 @@ async function searchTx(keyword, page, limit) {
         headers: attempt.headers,
         body: JSON.stringify(attempt.body),
       })
-      if (data.code != null && data.code !== 0) {
-        throw new Error(`code ${data.code}`)
-      }
+      if (data.code != null && data.code !== 0) throw new Error(`code ${data.code}`)
       const block = attempt.pick(data)
-      if (!block || block.code !== 0) {
-        throw new Error(`code ${block?.code ?? 'unknown'}`)
-      }
-      const list = attempt.songs(block)
-      if (!list.length) {
-        throw new Error('empty')
-      }
-      const total = attempt.total(block, list)
-      return {
-        total,
-        list: list.map((item) => {
-          const albumMid = item.album?.mid || ''
-          const songmid = item.mid || String(item.id)
-          const artists = Array.isArray(item.singer)
-            ? item.singer.map((s) => s.name).filter(Boolean).join(' / ')
-            : String(item.singer || item.author || '')
-          const txQ = parseTxQualities(item.file || {})
-          return song({
-            id: songmid,
-            name: item.name || item.title,
-            artist: artists,
-            album: item.album?.name || item.album?.title || '',
-            duration: Number(item.interval) || 0,
-            cover: albumMid
-              ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${albumMid}.jpg`
-              : null,
-            platform: 'tx',
-            qualitys: txQ.qualitys,
-            qualitySizes: txQ.sizes,
-            extra: {
-              songmid,
-              strMediaMid: item.file?.media_mid || songmid,
-              albumMid,
-              albumId: item.album?.id,
-            },
-          })
-        }),
-      }
+      if (!block || block.code !== 0) throw new Error(`code ${block?.code ?? 'unknown'}`)
+      const list = attempt.songs(block).map(mapTxSongItem).filter(Boolean)
+      if (!list.length) throw new Error('empty')
+      return { total: attempt.total(block, list), list }
     } catch (err) {
       lastError = err
     }
   }
-
   throw new Error(`QQ 搜索失败: ${lastError?.message || 'unknown'}`)
 }
 

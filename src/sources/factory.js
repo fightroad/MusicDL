@@ -38,6 +38,44 @@ export async function searchWithSource(
   }
 }
 
+/** Build LX-shaped musicInfo for custom-source musicUrl handlers. */
+function buildMusicInfo({ songId, platform, extra }) {
+  const ex = extra && typeof extra === 'object' ? extra : {}
+  const types = Array.isArray(ex.types)
+    ? ex.types
+    : Array.isArray(ex.qualitys)
+      ? ex.qualitys
+      : []
+  const _types =
+    ex._types && typeof ex._types === 'object'
+      ? ex._types
+      : ex._qualitys && typeof ex._qualitys === 'object'
+        ? ex._qualitys
+        : {}
+  return {
+    ...ex,
+    source: platform || ex.source,
+    name: ex.name || ex.songName || '',
+    singer: ex.singer || ex.artist || '',
+    albumName: ex.albumName || ex.album || '',
+    albumId: ex.albumId,
+    songmid: ex.songmid || songId,
+    songId: ex.songId || ex.songmid || songId,
+    hash: ex.hash,
+    strMediaMid: ex.strMediaMid,
+    albumMid: ex.albumMid,
+    copyrightId: ex.copyrightId,
+    contentId: ex.contentId,
+    img: ex.img || ex.cover || null,
+    types,
+    _types,
+    typeUrl: ex.typeUrl || {},
+    // aliases for scripts still reading MusicDL-era keys
+    qualitys: types,
+    _qualitys: _types,
+  }
+}
+
 export async function resolveWithSource(source, { songId, platform, quality, extra }) {
   if (source.kind !== 'lx') {
     throw new Error(`unsupported source kind: ${source.kind}`)
@@ -45,20 +83,7 @@ export async function resolveWithSource(source, { songId, platform, quality, ext
   if (!source.script) throw new Error('音源缺少脚本内容')
 
   const runtime = getCachedRuntime(source.id, source.script)
-  // Flatten LX-like musicInfo (scripts read songmid/hash/copyrightId/_qualitys, etc.)
-  const musicInfo = {
-    ...(extra || {}),
-    name: extra?.name || extra?.songName,
-    singer: extra?.singer || extra?.artist,
-    songmid: extra?.songmid || songId,
-    songId: extra?.songId || extra?.songmid || songId,
-    hash: extra?.hash,
-    albumId: extra?.albumId,
-    albumName: extra?.albumName || extra?.album,
-    strMediaMid: extra?.strMediaMid,
-    albumMid: extra?.albumMid,
-    copyrightId: extra?.copyrightId || extra?.contentId,
-  }
+  const musicInfo = buildMusicInfo({ songId, platform, extra })
   const url = await runtime.request({
     source: platform || (runtime.meta.platforms[0] || 'kw'),
     action: 'musicUrl',
