@@ -417,7 +417,7 @@ function openDownloadModal(song) {
     dlModal.hidden = false
     return
   }
-  dlStatus.textContent = '将保存到 data/downloads（MP3/FLAC 会尽量嵌入封面）'
+  dlStatus.textContent = '将保存到 data/downloads（MP3/FLAC 会尽量嵌入封面与歌词）'
   dlQualities.innerHTML = qualities
     .map((q) => {
       const size = estimateSize(song.duration, q)
@@ -462,6 +462,7 @@ async function downloadSong(song, quality = '128k') {
           artist: song.artist,
           album: song.album,
           cover: song.cover,
+          duration: song.duration,
         },
       }),
     })

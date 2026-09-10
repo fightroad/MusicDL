@@ -8,6 +8,7 @@ import {
   resolveWithSource,
   searchWithSource,
 } from '../sources/factory.js'
+import { fetchPlatformLyric } from '../sources/platformLyric.js'
 
 const router = Router()
 
@@ -125,22 +126,35 @@ router.post('/download', async (req, res) => {
     const title = artist ? `${name} - ${artist}` : name
     const ext = extForQuality(q, result.url)
     const { filename, fullPath } = buildSavePath(title, ext)
+    const plat = platform || 'kw'
 
-    const upstream = await fetch(result.url, {
-      headers: { 'User-Agent': 'MusicDL/0.1' },
-      redirect: 'follow',
-    })
+    const [upstream, lyric] = await Promise.all([
+      fetch(result.url, {
+        headers: { 'User-Agent': 'MusicDL/0.1' },
+        redirect: 'follow',
+      }),
+      fetchPlatformLyric(plat, {
+        songId: song_id,
+        extra: extra || {},
+        duration: extra?.duration,
+      }),
+    ])
     if (!upstream.ok) {
       return res.status(502).json({ detail: `下载上游失败: HTTP ${upstream.status}` })
     }
 
     const buf = Buffer.from(await upstream.arrayBuffer())
-    const { buffer: outBuf, embedded } = await embedDownloadMetaBuffer(buf, ext, {
-      coverUrl: extra?.cover,
-      title: name,
-      artist,
-      album,
-    })
+    const { buffer: outBuf, embeddedCover, embeddedLyric } = await embedDownloadMetaBuffer(
+      buf,
+      ext,
+      {
+        coverUrl: extra?.cover,
+        title: name,
+        artist,
+        album,
+        lyric,
+      }
+    )
     fs.writeFileSync(fullPath, outBuf)
 
     res.json({
@@ -148,7 +162,8 @@ router.post('/download', async (req, res) => {
       filename,
       quality: q,
       size: outBuf.length,
-      embedded_cover: embedded,
+      embedded_cover: embeddedCover,
+      embedded_lyric: embeddedLyric,
     })
   } catch (e) {
     res.status(e.status || 502).json({ detail: e.message || String(e) })

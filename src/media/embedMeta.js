@@ -73,19 +73,24 @@ function writeFlacTagsToBuffer(tags, sourceBuffer) {
 }
 
 /**
- * Embed basic tags (and cover when available) into an audio buffer in memory.
- * Returns the (possibly unchanged) buffer and whether cover was embedded.
+ * Embed basic tags, optional cover, and optional lyrics into an audio buffer.
+ * Returns the (possibly unchanged) buffer and what was embedded.
  */
-export async function embedDownloadMetaBuffer(audioBuffer, ext, { coverUrl, title, artist, album } = {}) {
+export async function embedDownloadMetaBuffer(
+  audioBuffer,
+  ext,
+  { coverUrl, title, artist, album, lyric } = {}
+) {
   const kind = String(ext || '').toLowerCase()
   if (!Buffer.isBuffer(audioBuffer) || !audioBuffer.length) {
-    return { buffer: audioBuffer, embedded: false }
+    return { buffer: audioBuffer, embeddedCover: false, embeddedLyric: false }
   }
   if (kind !== 'mp3' && kind !== 'flac') {
-    return { buffer: audioBuffer, embedded: false }
+    return { buffer: audioBuffer, embeddedCover: false, embeddedLyric: false }
   }
 
-  const hasText = Boolean(title || artist || album)
+  const lyricText = String(lyric || '').trim()
+  const hasText = Boolean(title || artist || album || lyricText)
   let picture = null
   try {
     picture = await fetchCoverBuffer(coverUrl)
@@ -93,7 +98,7 @@ export async function embedDownloadMetaBuffer(audioBuffer, ext, { coverUrl, titl
     picture = null
   }
   if (!hasText && !picture) {
-    return { buffer: audioBuffer, embedded: false }
+    return { buffer: audioBuffer, embeddedCover: false, embeddedLyric: false }
   }
 
   try {
@@ -111,12 +116,22 @@ export async function embedDownloadMetaBuffer(audioBuffer, ext, { coverUrl, titl
           imageBuffer: picture.buf,
         }
       }
+      if (lyricText) {
+        tags.unsynchronisedLyrics = {
+          language: 'chi',
+          text: lyricText,
+        }
+      }
       const out = NodeID3.write(tags, audioBuffer)
       if (out instanceof Error) throw out
       if (!Buffer.isBuffer(out) || !out.length) {
-        return { buffer: audioBuffer, embedded: false }
+        return { buffer: audioBuffer, embeddedCover: false, embeddedLyric: false }
       }
-      return { buffer: out, embedded: Boolean(picture) }
+      return {
+        buffer: out,
+        embeddedCover: Boolean(picture),
+        embeddedLyric: Boolean(lyricText),
+      }
     }
 
     const out = writeFlacTagsToBuffer(
@@ -125,6 +140,7 @@ export async function embedDownloadMetaBuffer(audioBuffer, ext, { coverUrl, titl
           ...(title ? { title } : {}),
           ...(artist ? { artist } : {}),
           ...(album ? { album } : {}),
+          ...(lyricText ? { lyrics: lyricText } : {}),
         },
         ...(picture
           ? { picture: { buffer: picture.buf, mime: picture.mime, description: 'Cover' } }
@@ -132,9 +148,13 @@ export async function embedDownloadMetaBuffer(audioBuffer, ext, { coverUrl, titl
       },
       audioBuffer
     )
-    return { buffer: out, embedded: Boolean(picture) }
+    return {
+      buffer: out,
+      embeddedCover: Boolean(picture),
+      embeddedLyric: Boolean(lyricText),
+    }
   } catch (err) {
     console.warn('[embedMeta]', err?.message || err)
-    return { buffer: audioBuffer, embedded: false }
+    return { buffer: audioBuffer, embeddedCover: false, embeddedLyric: false }
   }
 }
