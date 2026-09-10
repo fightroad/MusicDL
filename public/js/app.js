@@ -60,6 +60,7 @@ let currentPage = 1
 let pageSize = 20
 let totalItems = 0
 let searching = false
+let hasSearched = false
 let pendingDownloadSong = null
 
 const DL_CONCURRENCY = 2
@@ -197,13 +198,25 @@ async function loadSources() {
 function formatDuration(sec) {
   const n = Number(sec)
   if (!Number.isFinite(n) || n <= 0) return '--:--'
-  const s = Math.floor(n)
-  const m = Math.floor(s / 60)
-  const r = s % 60
-  return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
+  return formatTime(n)
+}
+
+function setSearchBusy(busy) {
+  searching = busy
+  btnSearch.disabled = busy
+  btnSearch.textContent = busy ? '搜索中…' : '搜索'
+  renderPager()
+}
+
+function renderResultsMessage(text) {
+  resultBody.innerHTML = `<tr class="results-msg"><td colspan="6">${escapeHtml(text)}</td></tr>`
 }
 
 function renderRows(songs) {
+  if (!songs.length) {
+    renderResultsMessage(hasSearched ? '未找到相关歌曲' : '输入关键词后点击搜索')
+    return
+  }
   const offset = (currentPage - 1) * pageSize
   resultBody.innerHTML = songs
     .map((s, idx) => {
@@ -220,7 +233,7 @@ function renderRows(songs) {
           <div class="song-line">
             <span class="song-name">${escapeHtml(s.name)}</span>${qTag}${pTag}
           </div>
-          <div class="song-sub">${escapeHtml(s.artist || '-')}</div>
+          <div class="song-sub">${escapeHtml(s.artist || '-')} · ${escapeHtml(s.album || '-')} · ${formatDuration(s.duration)}</div>
         </td>
         <td class="col-artist">${escapeHtml(s.artist || '-')}</td>
         <td class="col-album">${escapeHtml(s.album || '-')}</td>
@@ -245,10 +258,11 @@ async function doSearch({ resetPage = false } = {}) {
     toast('请输入关键词', { error: true })
     return
   }
+  if (searching) return
   if (resetPage) currentPage = 1
 
-  searching = true
-  renderPager()
+  setSearchBusy(true)
+  renderResultsMessage('搜索中…')
   try {
     const data = await api(
       `/api/music/search?source_id=${sourceId}` +
@@ -261,19 +275,20 @@ async function doSearch({ resetPage = false } = {}) {
     const pages = totalPages()
     if (currentPage > pages) {
       currentPage = pages
-      searching = false
+      setSearchBusy(false)
       return doSearch()
     }
+    hasSearched = true
     renderRows(data.list || [])
     renderPager()
   } catch (err) {
     toast(`搜索失败: ${err.message}`, { error: true, ms: 3200 })
-    resultBody.innerHTML = ''
+    hasSearched = true
+    renderResultsMessage('搜索失败，请重试')
     totalItems = 0
     renderPager()
   } finally {
-    searching = false
-    renderPager()
+    setSearchBusy(false)
   }
 }
 
@@ -746,6 +761,7 @@ btnLogout.addEventListener('click', async () => {
 })
 
 initAuthUi()
+renderResultsMessage('输入关键词后点击搜索')
 
 loadSources().catch((err) => {
   toast(`加载音源失败: ${err.message}`, { error: true })

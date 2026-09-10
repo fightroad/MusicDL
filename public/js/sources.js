@@ -17,6 +17,11 @@ function notifySearchSources() {
 
 function renderList() {
   const escapeHtml = window.escapeHtml
+  if (!sourcesList.length) {
+    body.innerHTML =
+      '<tr class="results-msg sources-empty"><td colspan="6">暂无音源，请先导入</td></tr>'
+    return
+  }
   body.innerHTML = sourcesList
     .map((s, idx) => {
       const desc = s.description

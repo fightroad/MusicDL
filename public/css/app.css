@@ -430,6 +430,10 @@ button.ghost {
 }
 button.danger { background: var(--danger); }
 button.small { padding: 6px 10px; font-size: 0.85rem; margin-right: 6px; }
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
 .toast {
   position: fixed;
@@ -616,6 +620,17 @@ th, td {
 th { color: var(--muted); font-weight: 600; font-size: 0.85rem; }
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: rgba(255, 255, 255, 0.03); }
+.results-msg td {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  border-bottom: none;
+  white-space: normal;
+}
+.results-msg:hover td {
+  background: transparent;
+}
 .col-idx {
   width: 52px;
   color: var(--muted);
@@ -1046,9 +1061,18 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
     overflow: visible;
   }
   #viewSearch td.col-song,
-  #viewSearch td.col-actions {
+  #viewSearch td.col-actions,
+  #viewSearch .results-msg td {
     display: block;
     width: auto;
+  }
+  #viewSearch .results-msg {
+    display: block;
+    padding: 36px 16px;
+  }
+  #viewSearch .results-msg td {
+    padding: 0;
+    text-align: center;
   }
   #viewSearch td.col-actions {
     display: flex;
@@ -1062,6 +1086,8 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
   }
   .song-sub {
     display: block;
+    white-space: normal;
+    line-height: 1.35;
   }
   .song-line {
     flex-wrap: wrap;
@@ -1102,6 +1128,17 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
     gap: 6px 10px;
     padding: 14px 12px;
     border-bottom: 1px solid var(--line);
+  }
+  #viewSources .sources-table tr.sources-empty {
+    display: block;
+    padding: 36px 16px;
+    border-bottom: none;
+  }
+  #viewSources .sources-table tr.sources-empty td {
+    display: block;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.92rem;
   }
   #viewSources .sources-table tr:last-child {
     border-bottom: none;
