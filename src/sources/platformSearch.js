@@ -463,13 +463,12 @@ const adapters = {
 export function listPlatformTabs(platforms) {
   const keys = (platforms || [])
     .map((p) => String(p).trim())
-    .filter((k) => k && k !== 'local')
+    .filter((k) => k && adapters[k])
   const ordered = PLATFORM_ORDER.filter((k) => keys.includes(k))
-  const extras = keys.filter((k) => !PLATFORM_ORDER.includes(k))
-  return [...ordered, ...extras].map((key) => ({
+  return ordered.map((key) => ({
     key,
-    name: PLATFORM_META[key]?.name || key,
-    searchable: Boolean(adapters[key]),
+    name: PLATFORM_META[key].name,
+    searchable: true,
   }))
 }
 
