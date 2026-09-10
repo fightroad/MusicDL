@@ -4,7 +4,13 @@
  */
 import crypto from 'node:crypto'
 import zlib from 'node:zlib'
-import { URL } from 'node:url'
+import { spawn } from 'node:child_process'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { fileURLToPath, URL } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const EVENT_NAMES = {
   request: 'request',
@@ -170,7 +176,8 @@ function lxRequest(url, options = {}, callback) {
   }
 }
 
-function parseLxMeta(script) {
+/** Parse LX script header only (same as LX import — no script execution). */
+export function parseLxMeta(script) {
   const meta = parseHeaderMeta(script)
   if (!meta.name) throw new Error('不是有效的洛雪音源：缺少 @name')
   return {
@@ -182,11 +189,22 @@ function parseLxMeta(script) {
   }
 }
 
+function installExitGuard() {
+  if (globalThis.__musicdlExitGuard) return
+  globalThis.__musicdlExitGuard = true
+  process.exit = (code) => {
+    console.error(`[MusicDL] blocked process.exit(${code ?? 0}) from source script`)
+  }
+  process.abort = () => {
+    console.error('[MusicDL] blocked process.abort() from source script')
+  }
+}
+
 /**
- * Load and initialize an LX custom-source script.
- * @returns {{ sources: object, meta: object, request: Function, dispose: Function }}
+ * Load and initialize an LX custom-source script (used inside child worker).
  */
 export function createLxRuntime(script) {
+  installExitGuard()
   if (!script || !String(script).trim()) {
     throw new Error('脚本内容为空')
   }
@@ -231,7 +249,6 @@ export function createLxRuntime(script) {
     request: wrappedRequest,
   }
 
-  // Isolate-ish scope: script sees globalThis.lx
   const sandboxGlobal = {
     lx,
     console,
@@ -244,10 +261,20 @@ export function createLxRuntime(script) {
   }
   sandboxGlobal.globalThis = sandboxGlobal
   sandboxGlobal.window = sandboxGlobal
+  sandboxGlobal.document = {
+    getElementsByTagName(tag) {
+      if (String(tag).toLowerCase() === 'script') {
+        const text = scriptMeta.rawScript || ''
+        return [{ innerText: text, textContent: text, src: '' }]
+      }
+      return []
+    },
+  }
 
   const fn = new Function(
     'globalThis',
     'window',
+    'document',
     'lx',
     'console',
     'Buffer',
@@ -259,6 +286,7 @@ export function createLxRuntime(script) {
   fn(
     sandboxGlobal,
     sandboxGlobal,
+    sandboxGlobal.document,
     lx,
     console,
     Buffer,
@@ -289,10 +317,7 @@ export function createLxRuntime(script) {
   }
 
   async function request({ source, action, info }) {
-    const result = await Promise.resolve(
-      requestHandler({ source, action, info })
-    )
-    return result
+    return Promise.resolve(requestHandler({ source, action, info }))
   }
 
   return {
@@ -313,22 +338,108 @@ export function createLxRuntime(script) {
   }
 }
 
-/** Cache runtimes by source id to avoid re-exec every request */
-const runtimeCache = new Map()
+/** In-memory capabilities from last successful child init (per source id). */
+const capabilityCache = new Map()
 
-export function getCachedRuntime(sourceId, script) {
-  const cached = runtimeCache.get(sourceId)
-  if (cached && cached.script === script) return cached.runtime
-  if (cached) cached.runtime.dispose()
-  const runtime = createLxRuntime(script)
-  runtimeCache.set(sourceId, { script, runtime })
-  return runtime
+export function getCachedCapabilities(sourceId) {
+  return capabilityCache.get(Number(sourceId)) || null
+}
+
+export function setCachedCapabilities(sourceId, meta) {
+  if (!meta) return
+  capabilityCache.set(Number(sourceId), {
+    platforms: meta.platforms || [],
+    qualitys: meta.qualitys || [],
+    platformQualitys: meta.platformQualitys || null,
+  })
 }
 
 export function dropRuntime(sourceId) {
-  const cached = runtimeCache.get(sourceId)
-  if (cached) {
-    cached.runtime.dispose()
-    runtimeCache.delete(sourceId)
-  }
+  capabilityCache.delete(Number(sourceId))
 }
+
+/**
+ * Resolve musicUrl in a child process. Returns { url, meta }.
+ * A crashing source only kills the child — not the MusicDL server.
+ */
+export function resolveMusicUrlInChild(script, request, timeoutMs = 30000) {
+  const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const scriptPath = path.join(os.tmpdir(), `musicdl-script-${id}.js`)
+  const reqPath = path.join(os.tmpdir(), `musicdl-req-${id}.json`)
+  const outPath = path.join(os.tmpdir(), `musicdl-out-${id}.json`)
+  fs.writeFileSync(scriptPath, String(script || ''), 'utf8')
+  fs.writeFileSync(reqPath, JSON.stringify(request || {}), 'utf8')
+
+  return new Promise((resolve, reject) => {
+    const workerPath = path.join(__dirname, 'resolve-worker.js')
+    const env = { ...process.env }
+    delete env.NODE_OPTIONS
+    const child = spawn(process.execPath, [workerPath, scriptPath, reqPath, outPath], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env,
+      windowsHide: true,
+    })
+
+    let settled = false
+    let stderr = ''
+    child.stderr?.on('data', (chunk) => {
+      stderr += String(chunk)
+    })
+
+    const cleanup = () => {
+      for (const p of [scriptPath, reqPath, outPath]) {
+        try {
+          fs.unlinkSync(p)
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    const finish = (err, result) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        // ignore
+      }
+      cleanup()
+      if (err) reject(err)
+      else resolve(result)
+    }
+
+    const timer = setTimeout(() => finish(new Error('音源取链超时')), timeoutMs)
+
+    child.on('error', (err) => finish(err))
+    child.on('exit', () => {
+      if (settled) return
+      let payload = null
+      try {
+        if (fs.existsSync(outPath)) {
+          payload = JSON.parse(fs.readFileSync(outPath, 'utf8'))
+        }
+      } catch {
+        payload = null
+      }
+      if (payload?.ok && typeof payload.url === 'string') {
+        finish(null, { url: payload.url, meta: payload.meta || null })
+        return
+      }
+      if (payload && payload.ok === false) {
+        finish(new Error(payload.error || '音源取链失败'))
+        return
+      }
+      const detail = stderr.trim().slice(-400)
+      finish(
+        new Error(
+          detail
+            ? `音源脚本异常退出: ${detail}`
+            : '音源脚本无法在 MusicDL 中运行'
+        )
+      )
+    })
+  })
+}
+

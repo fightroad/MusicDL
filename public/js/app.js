@@ -395,22 +395,12 @@ function qualitySizeText(song, quality) {
 
 const QUALITY_ORDER = ['128k', '192k', '320k', 'flac', 'flac24bit', '24bit']
 
-/** Prefer song.qualitys (already capped by server); fall back to platform script list. */
+/** Prefer song.qualitys (server may have capped via in-memory inited). */
 function sourceQualities(song) {
-  // 服务端已裁剪；空数组表示无交集，不要再回退到平台全量
   if (Array.isArray(song.qualitys)) {
     return sortQualities(song.qualitys.map(String).filter(Boolean))
   }
-
-  const source = sourcesCache.find((s) => s.id === song.source_id)
-  const byPlatform = source?.platformQualitys?.[song.platform || '']
-  if (Array.isArray(byPlatform) && byPlatform.length) return sortQualities(byPlatform)
-
-  const merged = String(source?.qualitys || '128k')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  return sortQualities(merged.length ? merged : ['128k'])
+  return ['128k']
 }
 
 function sortQualities(list) {

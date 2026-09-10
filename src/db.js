@@ -21,17 +21,6 @@ function emptyStore() {
   return { nextId: 1, sources: [] }
 }
 
-function parsePlatformQualitys(raw) {
-  if (!raw) return null
-  if (typeof raw === 'object' && !Array.isArray(raw)) return raw
-  try {
-    const parsed = JSON.parse(String(raw))
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
-
 function normalizeSource(row) {
   if (!row) return null
   return {
@@ -43,9 +32,6 @@ function normalizeSource(row) {
     homepage: row.homepage || null,
     script_url: row.script_url ?? row.scriptUrl ?? null,
     script: row.script || '',
-    platforms: row.platforms || 'kw,kg,tx,wy,mg',
-    qualitys: row.qualitys || '128k,320k',
-    platformQualitys: parsePlatformQualitys(row.platform_qualitys ?? row.platformQualitys),
     enabled: Boolean(row.enabled),
     description: row.description || null,
     sort_order: Number(row.sort_order) || 0,
@@ -135,33 +121,33 @@ export function upsertLxSource({
   homepage,
   scriptUrl,
   script,
-  platforms,
-  qualitys,
-  platformQualitys,
   description,
 }) {
   const store = readStore()
-  const pq =
-    platformQualitys && typeof platformQualitys === 'object' ? platformQualitys : null
   const stamp = nowIso()
   const idx = store.sources.findIndex((s) => s.name === name)
+
+  // LX-aligned: persist header + script only (no platforms/qualitys on disk)
+  const base = {
+    kind: 'lx',
+    version: version || null,
+    author: author || null,
+    homepage: homepage || null,
+    script_url: scriptUrl || null,
+    script,
+    description: description || null,
+    enabled: true,
+    updated_at: stamp,
+  }
 
   if (idx >= 0) {
     const prev = store.sources[idx]
     store.sources[idx] = {
-      ...prev,
-      kind: 'lx',
-      version: version || null,
-      author: author || null,
-      homepage: homepage || null,
-      script_url: scriptUrl || null,
-      script,
-      platforms: platforms.join(','),
-      qualitys: qualitys.join(','),
-      platform_qualitys: pq,
-      description: description || null,
-      enabled: true,
-      updated_at: stamp,
+      id: prev.id,
+      name,
+      sort_order: prev.sort_order,
+      created_at: prev.created_at,
+      ...base,
     }
     writeStore(store)
     return getSource(prev.id)
@@ -171,20 +157,9 @@ export function upsertLxSource({
   store.sources.push({
     id,
     name,
-    kind: 'lx',
-    version: version || null,
-    author: author || null,
-    homepage: homepage || null,
-    script_url: scriptUrl || null,
-    script,
-    platforms: platforms.join(','),
-    qualitys: qualitys.join(','),
-    platform_qualitys: pq,
-    enabled: true,
-    description: description || null,
+    ...base,
     sort_order: nextSortOrder(store.sources),
     created_at: stamp,
-    updated_at: stamp,
   })
   writeStore(store)
   return getSource(id)

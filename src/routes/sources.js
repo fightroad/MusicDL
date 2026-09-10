@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { createLxRuntime, dropRuntime } from '../lx/host.js'
+import { dropRuntime, parseLxMeta } from '../lx/host.js'
 import {
   deleteSource,
   getSource,
@@ -45,10 +45,8 @@ router.post('/import', async (req, res) => {
       script = await resp.text()
     }
 
-    // Validate by actually initializing (same as LX players)
-    const runtime = createLxRuntime(script)
-    const meta = runtime.meta
-    runtime.dispose()
+    // Best approach / LX-aligned: import only parses header + stores script.
+    const meta = parseLxMeta(script)
 
     const item = upsertLxSource({
       name: meta.name,
@@ -57,11 +55,10 @@ router.post('/import', async (req, res) => {
       homepage: meta.homepage,
       scriptUrl,
       script,
-      platforms: meta.platforms,
-      qualitys: meta.qualitys,
-      platformQualitys: meta.platformQualitys,
       description: meta.description,
     })
+    // Script may have changed — drop stale in-memory qualityList
+    dropRuntime(item.id)
 
     res.status(201).json(toPublicSource(item))
   } catch (e) {

@@ -1,12 +1,25 @@
-import { getCachedRuntime } from '../lx/host.js'
+import {
+  getCachedCapabilities,
+  resolveMusicUrlInChild,
+  setCachedCapabilities,
+} from '../lx/host.js'
 import { decorateListQualities, listPlatformTabs, searchPlatform } from './platformSearch.js'
 
+const DEFAULT_PLATFORMS = ['kw', 'kg', 'tx', 'wy', 'mg']
+
+/** LX-style: capabilities only from in-memory inited cache (never from disk). */
+function sourceCapabilities(source) {
+  const cached = getCachedCapabilities(source.id)
+  if (cached?.platforms?.length) return cached
+  return {
+    platforms: DEFAULT_PLATFORMS,
+    qualitys: [],
+    platformQualitys: null,
+  }
+}
+
 export function getSourcePlatformTabs(source) {
-  const platforms = String(source.platforms || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  return listPlatformTabs(platforms)
+  return listPlatformTabs(sourceCapabilities(source).platforms)
 }
 
 export async function searchWithSource(
@@ -19,15 +32,15 @@ export async function searchWithSource(
   if (source.kind !== 'lx') {
     throw new Error(`unsupported source kind: ${source.kind}`)
   }
-  const platforms = String(source.platforms || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const result = await searchPlatform(platforms, keyword, page, limit, platform)
+  // Never execute the LX script for search.
+  const caps = sourceCapabilities(source)
+  const result = await searchPlatform(caps.platforms, keyword, page, limit, platform)
+  // Before first successful inited: no script cap. After: intersect like LX qualityList.
+  const qualitys = caps.qualitys?.length ? caps.qualitys.join(',') : ''
   const list = decorateListQualities(
     result.list,
-    source.qualitys,
-    source.platformQualitys
+    qualitys,
+    caps.platformQualitys
   ).map((s) => ({
     ...s,
     source_id: source.id,
@@ -38,7 +51,6 @@ export async function searchWithSource(
   }
 }
 
-/** Build LX-shaped musicInfo for custom-source musicUrl handlers. */
 function buildMusicInfo({ songId, platform, extra }) {
   const ex = extra && typeof extra === 'object' ? extra : {}
   const types = Array.isArray(ex.types)
@@ -70,7 +82,6 @@ function buildMusicInfo({ songId, platform, extra }) {
     types,
     _types,
     typeUrl: ex.typeUrl || {},
-    // aliases for scripts still reading MusicDL-era keys
     qualitys: types,
     _qualitys: _types,
   }
@@ -82,15 +93,20 @@ export async function resolveWithSource(source, { songId, platform, quality, ext
   }
   if (!source.script) throw new Error('音源缺少脚本内容')
 
-  const runtime = getCachedRuntime(source.id, source.script)
-  const musicInfo = buildMusicInfo({ songId, platform, extra })
-  const url = await runtime.request({
-    source: platform || (runtime.meta.platforms[0] || 'kw'),
+  const plat = platform || 'kw'
+  const q = quality || '128k'
+  const musicInfo = buildMusicInfo({ songId, platform: plat, extra })
+  const { url, meta } = await resolveMusicUrlInChild(source.script, {
+    source: plat,
     action: 'musicUrl',
-    info: { type: quality || '128k', musicInfo },
+    info: { type: q, musicInfo },
   })
+
+  // LX-style qualityList: keep in memory only after successful inited
+  if (meta) setCachedCapabilities(source.id, meta)
+
   if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
     throw new Error(`音源返回的播放地址无效: ${String(url)}`)
   }
-  return { url, quality: quality || '128k' }
+  return { url, quality: q }
 }
