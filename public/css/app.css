@@ -368,11 +368,27 @@ nav .nav-queue.is-open {
 }
 input, select, button, textarea {
   font: inherit;
+  font-size: 16px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--panel);
   color: var(--text);
   padding: 10px 12px;
+  line-height: 1.25;
+}
+input[type="search"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: var(--panel);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%238fa3b8' d='M1.5 1.8h9L6 7.2z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 8px;
+  padding-right: 34px;
 }
 input:focus,
 select:focus,
@@ -693,8 +709,6 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
 }
 .player-cover.is-logo {
   object-fit: contain;
-  padding: 0;
-  background: transparent;
 }
 .player-meta {
   flex: 0 0 280px;
@@ -812,17 +826,33 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
   padding: 16px 20px;
   margin-bottom: 28px;
   background: rgba(26, 34, 44, 0.85);
+  min-width: 0;
+  max-width: 100%;
 }
 .import-section .card-form {
   margin-bottom: 0;
 }
-.import-form { display: grid; gap: 12px; }
+.import-form {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
 .import-form label {
   display: flex;
   flex-direction: column;
   gap: 6px;
   color: var(--muted);
   font-size: 0.9rem;
+  min-width: 0;
+}
+.import-form input,
+.import-form select,
+.import-form textarea,
+.import-form button,
+.import-form .actions {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 .actions { display: flex; gap: 10px; }
 
@@ -872,7 +902,9 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
   .search-bar select,
   .search-bar input,
   .search-bar button {
-    min-height: 42px;
+    height: 42px;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 
   .platform-tabs {
@@ -917,6 +949,10 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
   #viewSearch tr:last-child {
     border-bottom: none;
   }
+  #viewSearch tr:hover td,
+  #viewSources .sources-table tr:hover td {
+    background: transparent;
+  }
   #viewSearch td {
     display: none;
     padding: 0;
@@ -953,6 +989,7 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
     overflow: auto;
     gap: 14px;
     padding-bottom: 8px;
+    min-width: 0;
   }
   .page-home.page-sources-active .sources-list {
     flex: 0 0 auto;
@@ -965,17 +1002,6 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
   .sources-list h2 {
     font-size: 1.1rem;
     margin-bottom: 10px;
-  }
-  .import-form label {
-    font-size: 0.88rem;
-  }
-  .import-form input[type="url"],
-  .import-form input[type="file"],
-  .import-form button {
-    min-height: 42px;
-  }
-  .import-form .actions button {
-    width: 100%;
   }
 
   #viewSources .sources-table thead {
@@ -1069,12 +1095,31 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
     justify-content: space-between;
   }
   .pager select {
-    width: 100%;
-    min-height: 40px;
+    display: none;
   }
 
   .card-form {
     padding: 14px;
+    overflow: hidden;
+  }
+  .import-form label {
+    font-size: 0.88rem;
+  }
+  .import-form input[type="url"],
+  .import-form input[type="file"],
+  .import-form button {
+    height: 42px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .import-form input[type="file"] {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    height: auto;
+    min-height: 42px;
+  }
+  .import-form .actions button {
+    width: 100%;
   }
 
   .modal-card {
@@ -1084,7 +1129,7 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
   }
 
   .toast {
-    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
     max-width: calc(100% - 24px);
   }
 
@@ -1099,29 +1144,47 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
 
   .player {
     flex-wrap: wrap;
-    gap: 8px 10px;
+    gap: 4px 8px;
     height: auto;
-    min-height: 72px;
-    padding: 10px 12px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    min-height: 0;
+    padding: 6px 10px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   }
   .page-home .player {
     flex-basis: auto;
   }
   .player-cover-wrap {
-    width: 44px;
-    height: 44px;
-    flex-basis: 44px;
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    border-radius: 6px;
   }
   .player-meta {
-    flex: 1 1 calc(100% - 110px);
+    flex: 1 1 calc(100% - 90px);
     width: auto;
     max-width: none;
+  }
+  .player .now-title {
+    font-size: 0.9rem;
+    line-height: 1.25;
+  }
+  .player .now-artist {
+    font-size: 0.75rem;
+    margin-top: 0;
+    line-height: 1.25;
+  }
+  .player-btn {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
   }
   .player-progress {
     flex: 1 1 100%;
     min-width: 0;
     order: 5;
-    gap: 8px;
+    gap: 6px;
+  }
+  .player-progress .time {
+    font-size: 0.72rem;
   }
 }
