@@ -374,6 +374,17 @@ input, select, button, textarea {
   color: var(--text);
   padding: 10px 12px;
 }
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(61, 156, 240, 0.28);
+}
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(61, 156, 240, 0.35);
+}
 button {
   background: linear-gradient(135deg, var(--accent), #2563eb);
   border: none;
