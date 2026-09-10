@@ -73,8 +73,8 @@ const QUALITY_LABELS = {
   '192k': '较高音质 192K',
   '320k': '高清音质 320K',
   flac: '无损音质 FLAC',
-  flac24bit: '高解析度 FLAC',
-  '24bit': '高解析度 FLAC',
+  flac24bit: 'Hi-Res FLAC',
+  '24bit': 'Hi-Res FLAC',
 }
 
 const QUALITY_BITRATE = {
@@ -375,8 +375,8 @@ seekBar.addEventListener('input', () => {
 
 function formatSize(bytes) {
   if (!bytes || bytes <= 0) return ''
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`
+  return `${(bytes / 1024 / 1024).toFixed(2)}MB`
 }
 
 function estimateSize(durationSec, quality) {
@@ -384,6 +384,13 @@ function estimateSize(durationSec, quality) {
   const sec = Number(durationSec) || 0
   if (!sec) return ''
   return formatSize((sec * kbps * 1000) / 8)
+}
+
+/** Prefer API size (LX-style); fall back to duration estimate. */
+function qualitySizeText(song, quality) {
+  const raw = song?.qualitySizes?.[quality] || song?.qualitySizes?.[String(quality)]
+  if (raw) return String(raw)
+  return estimateSize(song?.duration, quality)
 }
 
 const QUALITY_ORDER = ['128k', '192k', '320k', 'flac', 'flac24bit', '24bit']
@@ -438,7 +445,7 @@ function openDownloadModal(song) {
   dlStatus.textContent = ''
   dlQualities.innerHTML = qualities
     .map((q) => {
-      const size = estimateSize(song.duration, q)
+      const size = qualitySizeText(song, q)
       const label = QUALITY_LABELS[q] || q
       const text = size ? `${label} - ${size}` : label
       return `<button type="button" class="quality-btn" data-quality="${q}">${escapeHtml(text)}</button>`
