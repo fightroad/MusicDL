@@ -353,6 +353,7 @@ audio.addEventListener('pause', syncPlayButton)
 audio.addEventListener('ended', () => {
   syncPlayButton()
   seekBar.value = '0'
+  syncSeekVisual()
   timeCurrent.textContent = '0:00'
 })
 audio.addEventListener('loadedmetadata', () => {
@@ -362,6 +363,7 @@ audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return
   if (!seekBar.matches(':active')) {
     seekBar.value = String(Math.round((audio.currentTime / audio.duration) * 1000))
+    syncSeekVisual()
   }
   timeCurrent.textContent = formatTime(audio.currentTime)
   timeTotal.textContent = formatTime(audio.duration)
@@ -371,7 +373,14 @@ seekBar.addEventListener('input', () => {
   const ratio = Number(seekBar.value) / 1000
   audio.currentTime = ratio * audio.duration
   timeCurrent.textContent = formatTime(audio.currentTime)
+  syncSeekVisual()
 })
+
+function syncSeekVisual() {
+  const max = Number(seekBar.max) || 1000
+  const pct = (Number(seekBar.value) / max) * 100
+  seekBar.style.setProperty('--seek-pct', `${Math.min(100, Math.max(0, pct))}%`)
+}
 
 function formatSize(bytes) {
   if (!bytes || bytes <= 0) return ''
@@ -646,6 +655,7 @@ dlQueueClear.addEventListener('click', clearFinishedDlJobs)
 dlQueueList.addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-dl-act]')
   if (!btn) return
+  e.stopPropagation()
   const id = Number(btn.dataset.id)
   if (btn.dataset.dlAct === 'cancel') cancelDlJob(id)
   if (btn.dataset.dlAct === 'retry') retryDlJob(id)

@@ -721,30 +721,49 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
   min-width: 0;
   -webkit-appearance: none;
   appearance: none;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+}
+.seek::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 999px;
-  background: #2a3542;
-  border: none;
-  padding: 0;
-  outline: none;
+  background: linear-gradient(
+    to right,
+    var(--accent-2) var(--seek-pct, 0%),
+    #2a3542 var(--seek-pct, 0%)
+  );
 }
 .seek::-webkit-slider-thumb {
   -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
+  margin-top: -3px;
   border-radius: 50%;
-  background: var(--accent-2);
   border: none;
-  cursor: pointer;
+  background: #e7eef6;
+}
+.seek::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  border: none;
+  background: #2a3542;
+}
+.seek::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent-2);
 }
 .seek::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--accent-2);
+  width: 12px;
+  height: 12px;
   border: none;
-  cursor: pointer;
+  border-radius: 50%;
+  background: #e7eef6;
 }
 .seek:disabled {
   opacity: 0.45;
