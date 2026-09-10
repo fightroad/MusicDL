@@ -10,6 +10,10 @@
   <header class="top">
     <a class="brand" href="#search" data-view="search">MusicDL</a>
     <nav>
+      <button type="button" id="dlQueueToggle" class="nav-link nav-queue" aria-expanded="false">
+        下载队列
+        <span id="dlQueueBadge" class="dl-queue-badge" hidden>0</span>
+      </button>
       <a href="#search" data-view="search" class="nav-link active">音乐搜索</a>
       <a href="#sources" data-view="sources" class="nav-link">音源管理</a>
     </nav>
@@ -106,6 +110,17 @@
   </div>
 
   <div id="toast" class="toast" hidden></div>
+
+  <aside id="dlQueuePanel" class="dl-queue-panel" hidden>
+    <header class="dl-queue-head">
+      <strong>下载队列</strong>
+      <div class="dl-queue-head-actions">
+        <button type="button" id="dlQueueClear" class="ghost small">清除已结束</button>
+      </div>
+    </header>
+    <ul id="dlQueueList" class="dl-queue-list"></ul>
+    <p id="dlQueueEmpty" class="dl-queue-empty">暂无任务</p>
+  </aside>
 
   <footer class="player">
     <div class="player-cover-wrap">

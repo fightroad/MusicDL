@@ -49,18 +49,12 @@ function extForQuality(quality, url = '') {
   return 'mp3'
 }
 
-/** Build unique path: 歌曲名 - 艺术家.mp3 / 歌曲名 - 艺术家 (2).mp3 */
+/** Final path: 歌曲名 - 艺术家.ext（同名则跳过，对齐洛雪 skipExistFile） */
 function buildSavePath(songName, ext) {
   const base = safeName(songName)
-  let filename = `${base}.${ext}`
-  let full = path.join(DOWNLOAD_DIR, filename)
-  let i = 2
-  while (fs.existsSync(full)) {
-    filename = `${base} (${i}).${ext}`
-    full = path.join(DOWNLOAD_DIR, filename)
-    i += 1
-  }
-  return { filename, fullPath: full }
+  const filename = `${base}.${ext}`
+  const fullPath = path.join(DOWNLOAD_DIR, filename)
+  return { filename, fullPath, exists: fs.existsSync(fullPath) }
 }
 
 router.get('/search', async (req, res) => {
@@ -128,7 +122,10 @@ router.post('/download', async (req, res) => {
     const album = String(extra?.album || '').trim()
     const title = artist ? `${name} - ${artist}` : name
     const ext = extForQuality(q, result.url)
-    const { filename, fullPath } = buildSavePath(title, ext)
+    const { filename, fullPath, exists } = buildSavePath(title, ext)
+    if (exists) {
+      return res.json({ ok: true, skipped: true, filename, quality: q })
+    }
     const plat = platform || 'kw'
 
     const [upstream, lyric] = await Promise.all([
@@ -158,7 +155,19 @@ router.post('/download', async (req, res) => {
         lyric,
       }
     )
-    fs.writeFileSync(fullPath, outBuf)
+    if (fs.existsSync(fullPath)) {
+      return res.json({ ok: true, skipped: true, filename, quality: q })
+    }
+    const tmpPath = `${fullPath}.partial`
+    try {
+      fs.writeFileSync(tmpPath, outBuf)
+      fs.renameSync(tmpPath, fullPath)
+    } catch (e) {
+      try {
+        fs.unlinkSync(tmpPath)
+      } catch (_) {}
+      throw e
+    }
 
     res.json({
       ok: true,

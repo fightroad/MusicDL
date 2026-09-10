@@ -42,6 +42,12 @@ const dlArtist = document.getElementById('dlArtist')
 const dlQualities = document.getElementById('dlQualities')
 const dlStatus = document.getElementById('dlStatus')
 const dlClose = document.getElementById('dlClose')
+const dlQueueToggle = document.getElementById('dlQueueToggle')
+const dlQueueBadge = document.getElementById('dlQueueBadge')
+const dlQueuePanel = document.getElementById('dlQueuePanel')
+const dlQueueList = document.getElementById('dlQueueList')
+const dlQueueEmpty = document.getElementById('dlQueueEmpty')
+const dlQueueClear = document.getElementById('dlQueueClear')
 
 let sourcesCache = []
 let currentPlatform = ''
@@ -51,6 +57,11 @@ let pageSize = 20
 let totalItems = 0
 let searching = false
 let pendingDownloadSong = null
+
+const DL_CONCURRENCY = 2
+let dlJobs = []
+let dlNextId = 1
+let dlActiveCount = 0
 
 function firstPlatformKey(tabs = currentTabs) {
   const hit = (tabs || []).find((t) => t.searchable !== false)
@@ -424,7 +435,7 @@ function openDownloadModal(song) {
     dlModal.hidden = false
     return
   }
-  dlStatus.textContent = '将保存到 data/downloads（MP3/FLAC 会尽量嵌入封面与歌词）'
+  dlStatus.textContent = ''
   dlQualities.innerHTML = qualities
     .map((q) => {
       const size = estimateSize(song.duration, q)
@@ -442,54 +453,186 @@ function closeDownloadModal() {
   dlStatus.textContent = ''
 }
 
-function formatSavedSize(bytes) {
-  if (!bytes) return ''
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+function dlJobLabel(job) {
+  const q = QUALITY_LABELS[job.quality] || job.quality
+  if (job.status === 'queued') return `排队中 · ${q}`
+  if (job.status === 'running') return `下载中 · ${q}`
+  if (job.status === 'skipped') return `已跳过（文件已存在）· ${job.filename || ''}`.trim()
+  if (job.status === 'done') {
+    const sizeTip = job.size ? ` · ${formatSize(job.size)}` : ''
+    return `已保存 ${job.filename || ''}${sizeTip}`.trim()
+  }
+  if (job.status === 'cancelled') return '已取消'
+  return job.error || '下载失败'
 }
 
-async function downloadSong(song, quality = '128k') {
+function openDlQueuePanel() {
+  dlQueuePanel.hidden = false
+  dlQueueToggle.setAttribute('aria-expanded', 'true')
+  dlQueueToggle.classList.add('is-open')
+}
+
+function closeDlQueuePanel() {
+  dlQueuePanel.hidden = true
+  dlQueueToggle.setAttribute('aria-expanded', 'false')
+  dlQueueToggle.classList.remove('is-open')
+}
+
+function toggleDlQueuePanel() {
+  if (dlQueuePanel.hidden) openDlQueuePanel()
+  else closeDlQueuePanel()
+}
+
+function renderDlQueue() {
+  const pending = dlJobs.filter((j) => j.status === 'queued' || j.status === 'running').length
+  const hasJobs = dlJobs.length > 0
+  if (pending > 0) {
+    dlQueueBadge.hidden = false
+    dlQueueBadge.textContent = String(pending)
+  } else {
+    dlQueueBadge.hidden = true
+  }
+
+  dlQueueEmpty.hidden = hasJobs
+  dlQueueList.innerHTML = dlJobs
+    .map((job) => {
+      const name = escapeHtml(job.song.name || '未知歌曲')
+      const artist = escapeHtml(job.song.artist || '')
+      const metaClass = job.status === 'error' ? 'dl-queue-meta is-error' : 'dl-queue-meta'
+      const meta = escapeHtml(dlJobLabel(job))
+      let actions = ''
+      if (job.status === 'queued') {
+        actions = `<button type="button" class="ghost small" data-dl-act="cancel" data-id="${job.id}">取消</button>`
+      } else if (job.status === 'running') {
+        actions = ''
+      } else if (job.status === 'error' || job.status === 'cancelled') {
+        actions = `<button type="button" class="ghost small" data-dl-act="retry" data-id="${job.id}">重试</button>
+          <button type="button" class="ghost small" data-dl-act="remove" data-id="${job.id}">移除</button>`
+      } else {
+        actions = `<button type="button" class="ghost small" data-dl-act="remove" data-id="${job.id}">移除</button>`
+      }
+      return `<li class="dl-queue-item" data-id="${job.id}">
+        <div class="dl-queue-name" title="${name}">${name}${artist ? ` · ${artist}` : ''}</div>
+        <div class="dl-queue-item-actions">${actions}</div>
+        <div class="${metaClass}">${meta}</div>
+      </li>`
+    })
+    .join('')
+}
+
+function enqueueDownload(song, quality = '128k') {
   const q = quality || '128k'
-  dlStatus.textContent = `正在保存 ${QUALITY_LABELS[q] || q}…`
-  const buttons = dlQualities.querySelectorAll('button')
-  buttons.forEach((b) => {
-    b.disabled = true
-  })
+  const job = {
+    id: dlNextId++,
+    song,
+    quality: q,
+    status: 'queued',
+    error: null,
+    filename: null,
+    size: 0,
+    abortController: null,
+  }
+  dlJobs.unshift(job)
+  renderDlQueue()
+  pumpDlQueue()
+  closeDownloadModal()
+}
+
+function pumpDlQueue() {
+  while (dlActiveCount < DL_CONCURRENCY) {
+    const next = [...dlJobs].reverse().find((j) => j.status === 'queued')
+    if (!next) break
+    void runDlJob(next)
+  }
+}
+
+async function runDlJob(job) {
+  if (job.status !== 'queued') return
+  job.status = 'running'
+  job.error = null
+  job.abortController = new AbortController()
+  dlActiveCount += 1
+  renderDlQueue()
   try {
     const data = await api('/api/music/download', {
       method: 'POST',
+      signal: job.abortController.signal,
       body: JSON.stringify({
-        source_id: song.source_id,
-        song_id: song.id,
-        platform: song.platform || 'kw',
-        quality: q,
+        source_id: job.song.source_id,
+        song_id: job.song.id,
+        platform: job.song.platform || 'kw',
+        quality: job.quality,
         extra: {
-          ...song.extra,
-          name: song.name,
-          artist: song.artist,
-          album: song.album,
-          cover: song.cover,
-          duration: song.duration,
+          ...job.song.extra,
+          name: job.song.name,
+          artist: job.song.artist,
+          album: job.song.album,
+          cover: job.song.cover,
+          duration: job.song.duration,
         },
       }),
     })
-    const sizeTip = data.size ? ` · ${formatSavedSize(data.size)}` : ''
-    dlStatus.textContent = `已保存到 ${data.filename}`
-    toast(`已保存: ${data.filename}${sizeTip}`)
-    setTimeout(() => closeDownloadModal(), 800)
+    if (job.status === 'cancelled') return
+    if (data.skipped) {
+      job.status = 'skipped'
+      job.filename = data.filename
+      job.size = 0
+      return
+    }
+    job.status = 'done'
+    job.filename = data.filename
+    job.size = data.size || 0
   } catch (err) {
-    dlStatus.textContent = `下载失败: ${err.message}`
-    toast(`下载失败: ${err.message}`, { error: true })
-    buttons.forEach((b) => {
-      b.disabled = false
-    })
+    if (job.status === 'cancelled' || err.name === 'AbortError') {
+      job.status = 'cancelled'
+      job.error = null
+    } else {
+      job.status = 'error'
+      job.error = err.message || '下载失败'
+      toast(`下载失败: ${job.song.name || ''} ${job.error}`.trim(), { error: true })
+    }
+  } finally {
+    job.abortController = null
+    dlActiveCount = Math.max(0, dlActiveCount - 1)
+    renderDlQueue()
+    pumpDlQueue()
   }
+}
+
+function cancelDlJob(id) {
+  const job = dlJobs.find((j) => j.id === id)
+  if (!job || job.status !== 'queued') return
+  job.status = 'cancelled'
+  renderDlQueue()
+}
+
+function retryDlJob(id) {
+  const job = dlJobs.find((j) => j.id === id)
+  if (!job || (job.status !== 'error' && job.status !== 'cancelled')) return
+  job.status = 'queued'
+  job.error = null
+  job.filename = null
+  job.size = 0
+  renderDlQueue()
+  pumpDlQueue()
+}
+
+function removeDlJob(id) {
+  const job = dlJobs.find((j) => j.id === id)
+  if (!job || job.status === 'running' || job.status === 'queued') return
+  dlJobs = dlJobs.filter((j) => j.id !== id)
+  renderDlQueue()
+}
+
+function clearFinishedDlJobs() {
+  dlJobs = dlJobs.filter((j) => j.status === 'queued' || j.status === 'running')
+  renderDlQueue()
 }
 
 dlQualities.addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-quality]')
   if (!btn || !pendingDownloadSong) return
-  downloadSong(pendingDownloadSong, btn.dataset.quality)
+  enqueueDownload(pendingDownloadSong, btn.dataset.quality)
 })
 
 dlClose.addEventListener('click', closeDownloadModal)
@@ -498,6 +641,23 @@ dlModal.addEventListener('click', (e) => {
 })
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !dlModal.hidden) closeDownloadModal()
+  else if (e.key === 'Escape' && !dlQueuePanel.hidden) closeDlQueuePanel()
+})
+
+dlQueueToggle.addEventListener('click', toggleDlQueuePanel)
+dlQueueClear.addEventListener('click', clearFinishedDlJobs)
+dlQueueList.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-dl-act]')
+  if (!btn) return
+  const id = Number(btn.dataset.id)
+  if (btn.dataset.dlAct === 'cancel') cancelDlJob(id)
+  if (btn.dataset.dlAct === 'retry') retryDlJob(id)
+  if (btn.dataset.dlAct === 'remove') removeDlJob(id)
+})
+document.addEventListener('click', (e) => {
+  if (dlQueuePanel.hidden) return
+  if (dlQueuePanel.contains(e.target) || dlQueueToggle.contains(e.target)) return
+  closeDlQueuePanel()
 })
 
 platformTabsEl.addEventListener('click', (e) => {
