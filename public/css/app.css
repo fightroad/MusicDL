@@ -435,15 +435,12 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
 .col-album { width: 22%; }
 .col-duration {
   width: 72px;
-  text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 .col-actions {
-  width: 148px;
-  text-align: center;
+  width: 80px;
   overflow: visible;
-  white-space: nowrap;
 }
 .song-cell {
   min-width: 0;
