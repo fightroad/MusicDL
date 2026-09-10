@@ -12,6 +12,9 @@ import { fetchPlatformLyric } from '../sources/platformLyric.js'
 
 const router = Router()
 
+const BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+
 function loadEnabledSource(id) {
   const item = getSource(Number(id))
   if (!item) {
@@ -130,7 +133,7 @@ router.post('/download', async (req, res) => {
 
     const [upstream, lyric] = await Promise.all([
       fetch(result.url, {
-        headers: { 'User-Agent': 'MusicDL/0.1' },
+        headers: { 'User-Agent': BROWSER_UA },
         redirect: 'follow',
       }),
       fetchPlatformLyric(plat, {
@@ -183,7 +186,7 @@ async function loadAudioBuffer(url) {
   }
 
   const upstream = await fetch(url, {
-    headers: { 'User-Agent': 'MusicDL/0.1' },
+    headers: { 'User-Agent': BROWSER_UA },
     redirect: 'follow',
   })
   if (!upstream.ok) {

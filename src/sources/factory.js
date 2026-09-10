@@ -45,14 +45,19 @@ export async function resolveWithSource(source, { songId, platform, quality, ext
   if (!source.script) throw new Error('音源缺少脚本内容')
 
   const runtime = getCachedRuntime(source.id, source.script)
+  // Flatten LX-like musicInfo (scripts read songmid/hash/copyrightId/_qualitys, etc.)
   const musicInfo = {
+    ...(extra || {}),
+    name: extra?.name || extra?.songName,
+    singer: extra?.singer || extra?.artist,
     songmid: extra?.songmid || songId,
-    songId: extra?.songmid || songId,
+    songId: extra?.songId || extra?.songmid || songId,
     hash: extra?.hash,
     albumId: extra?.albumId,
-    name: extra?.name,
-    singer: extra?.artist,
-    ...(extra || {}),
+    albumName: extra?.albumName || extra?.album,
+    strMediaMid: extra?.strMediaMid,
+    albumMid: extra?.albumMid,
+    copyrightId: extra?.copyrightId || extra?.contentId,
   }
   const url = await runtime.request({
     source: platform || (runtime.meta.platforms[0] || 'kw'),

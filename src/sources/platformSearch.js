@@ -220,6 +220,31 @@ async function searchWy(keyword, page, limit) {
   }
 }
 
+/** LX-style kg quality maps (scripts often pick hash via _qualitys[type].hash). */
+function buildKgQualityInfo(item) {
+  const pairs = [
+    ['128k', item.FileHash],
+    ['320k', item.HQFileHash],
+    ['flac', item.SQFileHash],
+    ['flac24bit', item.ResFileHash || item.HiResFileHash],
+  ]
+  const qualityKeys = []
+  const qualitys = []
+  const _qualitys = {}
+  for (const [type, hash] of pairs) {
+    if (!hash) continue
+    qualityKeys.push(type)
+    qualitys.push({ type, size: null, hash })
+    _qualitys[type] = { size: null, hash }
+  }
+  if (!qualityKeys.length && item.FileHash) {
+    qualityKeys.push('128k')
+    qualitys.push({ type: '128k', size: null, hash: item.FileHash })
+    _qualitys['128k'] = { size: null, hash: item.FileHash }
+  }
+  return { qualityKeys, qualitys, _qualitys }
+}
+
 async function searchKg(keyword, page, limit) {
   const url =
     'https://complexsearch.kugou.com/v2/search/song?' +
@@ -239,10 +264,7 @@ async function searchKg(keyword, page, limit) {
   return {
     total: Number(data.data?.total || lists.length),
     list: lists.map((item) => {
-      const qualitys = ['128k']
-      if (item.HQFileHash) qualitys.push('320k')
-      if (item.SQFileHash) qualitys.push('flac')
-      if (item.ResFileHash || item.HiResFileHash) qualitys.push('flac24bit')
+      const { qualityKeys, qualitys, _qualitys } = buildKgQualityInfo(item)
       return song({
         id: item.FileHash || item.EMixSongID || item.ID,
         name: item.SongName || item.OriSongName,
@@ -251,11 +273,14 @@ async function searchKg(keyword, page, limit) {
         duration: Number(item.Duration || 0),
         cover: item.Image?.replace('{size}', '240') || null,
         platform: 'kg',
-        qualitys,
+        qualitys: qualityKeys.length ? qualityKeys : ['128k'],
         extra: {
           songmid: item.FileHash || item.EMixSongID,
           hash: item.FileHash,
           albumId: item.AlbumID,
+          albumAudioId: item.AlbumAudioId || item.AudioId || undefined,
+          qualitys,
+          _qualitys,
         },
       })
     }),
@@ -293,7 +318,8 @@ async function searchMg(keyword, page, limit) {
         qualitys,
         extra: {
           songmid: item.copyrightId || item.id,
-          contentId: item.copyrightId,
+          copyrightId: item.copyrightId || item.id,
+          contentId: item.contentId || item.copyrightId || item.id,
         },
       })
     }),

@@ -12,6 +12,9 @@ const EVENT_NAMES = {
   updateAlert: 'updateAlert',
 }
 
+/** Official LX source keys (exclude local / custom extras like qsvip). */
+const LX_PLATFORM_KEYS = new Set(['kw', 'kg', 'tx', 'wy', 'mg'])
+
 function parseHeaderMeta(script) {
   const meta = {}
   const re = /^\s*\*\s*@(name|description|version|author|homepage)\s+(.+?)\s*$/gim
@@ -43,7 +46,8 @@ function md5(str) {
 }
 
 function randomBytes(size) {
-  return crypto.randomBytes(size).toString('hex').slice(0, size)
+  const n = Math.max(0, Number(size) || 0)
+  return crypto.randomBytes(n)
 }
 
 function aesEncrypt(data, mode, key, iv) {
@@ -92,6 +96,27 @@ async function nodeFetch(url, options = {}) {
         headers['Content-Type'] = 'application/json'
       }
     }
+  } else if (options.formData) {
+    const fd = new FormData()
+    const raw = options.formData
+    if (raw && typeof raw === 'object') {
+      for (const [key, value] of Object.entries(raw)) {
+        if (value == null) continue
+        if (typeof value === 'object' && value.value != null) {
+          // { value, options: { filename, contentType } } style
+          const blob =
+            Buffer.isBuffer(value.value) || value.value instanceof Uint8Array
+              ? new Blob([value.value], { type: value.options?.contentType || value.contentType })
+              : value.value
+          fd.append(key, blob, value.options?.filename || value.filename)
+        } else {
+          fd.append(key, value)
+        }
+      }
+    }
+    body = fd
+    delete headers['Content-Type']
+    delete headers['content-type']
   } else if (options.form) {
     body = new URLSearchParams(options.form).toString()
     if (!headers['Content-Type'] && !headers['content-type']) {
@@ -250,7 +275,7 @@ export function createLxRuntime(script) {
   }
 
   const sources = initedPayload.sources || {}
-  const platforms = Object.keys(sources).filter((k) => k !== 'local')
+  const platforms = Object.keys(sources).filter((k) => LX_PLATFORM_KEYS.has(k))
   const platformQualitys = {}
   const qualitys = []
   for (const key of platforms) {
