@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Router } from 'express'
 import { DOWNLOAD_DIR, getSource } from '../db.js'
+import { embedDownloadMetaBuffer } from '../media/embedMeta.js'
 import {
   getSourcePlatformTabs,
   resolveWithSource,
@@ -44,7 +45,7 @@ function extForQuality(quality, url = '') {
   return 'mp3'
 }
 
-/** Build unique path: 歌曲名.mp3 / 歌曲名 (2).mp3 */
+/** Build unique path: 歌曲名 - 艺术家.mp3 / 歌曲名 - 艺术家 (2).mp3 */
 function buildSavePath(songName, ext) {
   const base = safeName(songName)
   let filename = `${base}.${ext}`
@@ -118,7 +119,10 @@ router.post('/download', async (req, res) => {
       extra: extra || {},
     })
 
-    const title = String(extra?.name || song_id).trim() || String(song_id)
+    const name = String(extra?.name || song_id).trim() || String(song_id)
+    const artist = String(extra?.artist || '').trim()
+    const album = String(extra?.album || '').trim()
+    const title = artist ? `${name} - ${artist}` : name
     const ext = extForQuality(q, result.url)
     const { filename, fullPath } = buildSavePath(title, ext)
 
@@ -131,13 +135,20 @@ router.post('/download', async (req, res) => {
     }
 
     const buf = Buffer.from(await upstream.arrayBuffer())
-    fs.writeFileSync(fullPath, buf)
+    const { buffer: outBuf, embedded } = await embedDownloadMetaBuffer(buf, ext, {
+      coverUrl: extra?.cover,
+      title: name,
+      artist,
+      album,
+    })
+    fs.writeFileSync(fullPath, outBuf)
 
     res.json({
       ok: true,
       filename,
       quality: q,
-      size: buf.length,
+      size: outBuf.length,
+      embedded_cover: embedded,
     })
   } catch (e) {
     res.status(e.status || 502).json({ detail: e.message || String(e) })
