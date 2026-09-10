@@ -441,7 +441,7 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
 }
 .col-actions {
   width: 148px;
-  text-align: right;
+  text-align: center;
   overflow: visible;
   white-space: nowrap;
 }
