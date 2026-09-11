@@ -33,6 +33,7 @@ function renderDownloads(list) {
         <td class="col-time">${time}</td>
         <td class="col-actions">
           <button type="button" class="small" data-play-file="${key}">播放</button>
+          <button type="button" class="small" data-save-file="${key}">下载</button>
           <button type="button" class="small danger" data-del-file="${key}">删除</button>
         </td>
       </tr>`
@@ -56,6 +57,19 @@ downloadBody.addEventListener('click', async (e) => {
     const filename = decodeURIComponent(playBtn.dataset.playFile || '')
     if (!filename || typeof window.playLocalFile !== 'function') return
     window.playLocalFile(filename)
+    return
+  }
+
+  const saveBtn = e.target.closest('button[data-save-file]')
+  if (saveBtn) {
+    const filename = decodeURIComponent(saveBtn.dataset.saveFile || '')
+    if (!filename) return
+    const a = document.createElement('a')
+    a.href = `/api/music/files/${encodeURIComponent(filename)}?download=1`
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
     return
   }
 

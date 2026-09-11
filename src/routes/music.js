@@ -327,11 +327,18 @@ function contentTypeForFile(filename) {
   return 'application/octet-stream'
 }
 
-function streamLocalFile(req, res, fullPath, filename) {
+function streamLocalFile(req, res, fullPath, filename, { asAttachment = false } = {}) {
   const total = fs.statSync(fullPath).size
   res.setHeader('Accept-Ranges', 'bytes')
   res.setHeader('Content-Type', contentTypeForFile(filename))
   res.setHeader('Cache-Control', 'private, max-age=3600')
+  if (asAttachment) {
+    const ascii = String(filename).replace(/[^\x20-\x7E]/g, '_') || 'download'
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`
+    )
+  }
 
   const range = req.headers.range
   let start = 0
@@ -387,7 +394,8 @@ router.get('/files/:filename', (req, res) => {
     if (!fs.existsSync(fullPath)) {
       return res.status(404).json({ detail: '文件不存在' })
     }
-    streamLocalFile(req, res, fullPath, filename)
+    const asAttachment = req.query.download === '1'
+    streamLocalFile(req, res, fullPath, filename, { asAttachment })
   } catch (e) {
     res.status(e.status || 500).json({ detail: e.message || String(e) })
   }
