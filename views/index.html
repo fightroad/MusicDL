@@ -20,7 +20,7 @@
         <span class="nav-label-short">队列</span>
         <span id="dlQueueBadge" class="dl-queue-badge" hidden>0</span>
       </button>
-      <a href="#search" data-view="search" class="nav-link active">
+      <a href="#search" data-view="search" class="nav-link">
         <span class="nav-label-full">音乐搜索</span>
         <span class="nav-label-short">搜索</span>
       </a>
@@ -36,7 +36,7 @@
     </nav>
   </header>
 
-  <main id="viewSearch" class="wrap view-panel">
+  <main id="viewSearch" class="wrap view-panel" hidden>
     <section class="search-bar">
       <select id="sourceSelect"></select>
       <input id="keyword" type="search" enterkeyhint="search" placeholder="输入歌名 / 歌手" />
@@ -76,6 +76,20 @@
       </div>
     </div>
   </main>
+  <script>
+    (() => {
+      const h = location.hash
+      const view =
+        h === '#sources' ? 'sources' : h === '#downloads' ? 'downloads' : 'search'
+      document.documentElement.dataset.bootView = view
+      if (view === 'search') {
+        document.getElementById('viewSearch').hidden = false
+      }
+      document.querySelectorAll('nav a.nav-link[data-view]').forEach((a) => {
+        a.classList.toggle('active', a.dataset.view === view)
+      })
+    })()
+  </script>
 
   <main id="viewSources" class="wrap view-panel view-sources" hidden>
     <section class="import-section">
@@ -114,6 +128,13 @@
       </div>
     </section>
   </main>
+  <script>
+    (() => {
+      if (document.documentElement.dataset.bootView !== 'sources') return
+      document.getElementById('viewSources').hidden = false
+      document.body.classList.add('page-sources-active')
+    })()
+  </script>
 
   <main id="viewDownloads" class="wrap view-panel view-downloads" hidden>
     <section class="downloads-list">
@@ -132,6 +153,13 @@
       </div>
     </section>
   </main>
+  <script>
+    (() => {
+      if (document.documentElement.dataset.bootView !== 'downloads') return
+      document.getElementById('viewDownloads').hidden = false
+      document.body.classList.add('page-downloads-active')
+    })()
+  </script>
 
   <div id="dlModal" class="modal" hidden>
     <div class="modal-card">
