@@ -9,6 +9,7 @@ import {
   searchWithSource,
 } from '../sources/factory.js'
 import { fetchPlatformLyric } from '../sources/platformLyric.js'
+import { tipSearchPlatform } from '../sources/platformTipSearch.js'
 
 const router = Router()
 
@@ -86,6 +87,19 @@ router.get('/platforms', (req, res) => {
     res.json({ tabs: getSourcePlatformTabs(source) })
   } catch (e) {
     res.status(e.status || 400).json({ detail: e.message || String(e) })
+  }
+})
+
+/** LX-style tipSearch suggestions for the current platform tab. */
+router.get('/suggest', async (req, res) => {
+  try {
+    const keyword = String(req.query.keyword || '').trim()
+    const platform = String(req.query.platform || '').trim() || 'kw'
+    if (!keyword) return res.json({ list: [] })
+    const list = await tipSearchPlatform(platform, keyword)
+    res.json({ list, platform })
+  } catch (e) {
+    res.status(e.status || 502).json({ detail: e.message || String(e) })
   }
 })
 

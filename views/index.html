@@ -39,7 +39,10 @@
   <main id="viewSearch" class="wrap view-panel" hidden>
     <section class="search-bar">
       <select id="sourceSelect"></select>
-      <input id="keyword" type="search" enterkeyhint="search" placeholder="输入歌名 / 歌手" />
+      <div class="keyword-wrap">
+        <input id="keyword" type="search" enterkeyhint="search" autocomplete="off" placeholder="输入歌名 / 歌手" />
+        <ul id="suggestList" class="suggest-list" hidden role="listbox"></ul>
+      </div>
       <button id="btnSearch" type="button">搜索</button>
     </section>
 

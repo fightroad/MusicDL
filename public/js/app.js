@@ -23,6 +23,7 @@ async function api(path, options = {}) {
 
 const sourceSelect = document.getElementById('sourceSelect')
 const keywordInput = document.getElementById('keyword')
+const suggestListEl = document.getElementById('suggestList')
 const btnSearch = document.getElementById('btnSearch')
 const platformTabsEl = document.getElementById('platformTabs')
 const resultBody = document.getElementById('resultBody')
@@ -274,6 +275,7 @@ async function doSearch({ resetPage = false } = {}) {
   if (resetPage) currentPage = 1
 
   setSearchBusy(true)
+  hideSuggest()
   renderResultsMessage('搜索中…')
   try {
     const data = await api(
@@ -754,7 +756,11 @@ platformTabsEl.addEventListener('click', (e) => {
   if (!btn || btn.disabled) return
   currentPlatform = btn.dataset.platform
   renderPlatformTabs(currentTabs)
-  if (keywordInput.value.trim()) doSearch({ resetPage: true })
+  hideSuggest()
+  if (keywordInput.value.trim()) {
+    scheduleSuggest()
+    doSearch({ resetPage: true })
+  }
 })
 
 sourceSelect.addEventListener('change', async () => {
@@ -798,9 +804,125 @@ resultBody.addEventListener('click', (e) => {
   if (btn.dataset.act === 'dl') openDownloadModal(song)
 })
 
-btnSearch.addEventListener('click', () => doSearch({ resetPage: true }))
+btnSearch.addEventListener('click', () => {
+  hideSuggest()
+  doSearch({ resetPage: true })
+})
+
+let suggestTips = []
+let suggestIndex = -1
+let suggestTimer = null
+let suggestSeq = 0
+
+function hideSuggest() {
+  suggestTips = []
+  suggestIndex = -1
+  if (suggestListEl) {
+    suggestListEl.hidden = true
+    suggestListEl.innerHTML = ''
+  }
+}
+
+function renderSuggest() {
+  if (!suggestListEl) return
+  if (!suggestTips.length) {
+    hideSuggest()
+    return
+  }
+  suggestListEl.hidden = false
+  suggestListEl.innerHTML = suggestTips
+    .map((tip, i) => {
+      const active = i === suggestIndex ? ' is-active' : ''
+      return `<li role="option"><button type="button" class="suggest-item${active}" data-tip-idx="${i}">${escapeHtml(tip)}</button></li>`
+    })
+    .join('')
+}
+
+function applySuggest(tip) {
+  const text = String(tip || '').trim()
+  if (!text) return
+  hideSuggest()
+  keywordInput.value = text
+  doSearch({ resetPage: true })
+}
+
+async function fetchSuggest() {
+  const keyword = keywordInput.value.trim()
+  if (!keyword) {
+    hideSuggest()
+    return
+  }
+  const platform = currentPlatform || firstPlatformKey() || 'kw'
+  const seq = ++suggestSeq
+  try {
+    const data = await api(
+      `/api/music/suggest?keyword=${encodeURIComponent(keyword)}` +
+        `&platform=${encodeURIComponent(platform)}`
+    )
+    if (seq !== suggestSeq) return
+    suggestTips = Array.isArray(data?.list) ? data.list : []
+    suggestIndex = -1
+    renderSuggest()
+  } catch (_) {
+    if (seq !== suggestSeq) return
+    hideSuggest()
+  }
+}
+
+function scheduleSuggest() {
+  clearTimeout(suggestTimer)
+  suggestTimer = setTimeout(fetchSuggest, 280)
+}
+
+keywordInput.addEventListener('input', () => {
+  scheduleSuggest()
+})
+
 keywordInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') doSearch({ resetPage: true })
+  const open = suggestListEl && !suggestListEl.hidden && suggestTips.length > 0
+  if (e.key === 'ArrowDown' && open) {
+    e.preventDefault()
+    suggestIndex = (suggestIndex + 1) % suggestTips.length
+    renderSuggest()
+    return
+  }
+  if (e.key === 'ArrowUp' && open) {
+    e.preventDefault()
+    suggestIndex = suggestIndex <= 0 ? suggestTips.length - 1 : suggestIndex - 1
+    renderSuggest()
+    return
+  }
+  if (e.key === 'Escape') {
+    hideSuggest()
+    return
+  }
+  if (e.key === 'Enter') {
+    if (open && suggestIndex >= 0 && suggestTips[suggestIndex]) {
+      e.preventDefault()
+      applySuggest(suggestTips[suggestIndex])
+      return
+    }
+    hideSuggest()
+    doSearch({ resetPage: true })
+  }
+})
+
+suggestListEl?.addEventListener('mousedown', (e) => {
+  const btn = e.target.closest('button[data-tip-idx]')
+  if (!btn) return
+  e.preventDefault()
+  const idx = Number(btn.dataset.tipIdx)
+  applySuggest(suggestTips[idx])
+})
+
+keywordInput.addEventListener('blur', () => {
+  setTimeout(hideSuggest, 120)
+})
+
+document.addEventListener('click', (e) => {
+  if (!suggestListEl || suggestListEl.hidden) return
+  if (keywordInput.contains(e.target) || suggestListEl.contains(e.target)) return
+  hideSuggest()
 })
 
 const btnLogout = document.getElementById('btnLogout')
