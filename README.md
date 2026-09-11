@@ -17,8 +17,9 @@
 ## 功能
 
 - 导入洛雪兼容自定义音源（URL 或本地 `.js`）
-- 按平台搜索（酷我 / 酷狗 / QQ / 网易云 / 咪咕）
-- 试听、按音质下载；MP3/FLAC 可写入封面与歌词
+- 按平台搜索（酷我 / 酷狗 / QQ / 网易云 / 咪咕），输入时可联想提示
+- 试听、按音质下载；下载队列；MP3/FLAC 可写入封面与歌词
+- 音乐管理：本地已下载列表、播放与删除
 - 下载文件落在 `data/downloads/`，便于挂载给 Navidrome
 
 ## 要求
@@ -56,16 +57,6 @@ AUTH_PASSWORD='你的密码' HOST=0.0.0.0 npm start
 - 未设置 `AUTH_PASSWORD` 时不启用登录（适合本机使用）
 - 登录态为 HttpOnly cookie，默认约 7 天
 
-Docker 示例：
-
-```bash
-docker run -d --name musicdl \
-  -p 8000:8000 \
-  -e AUTH_PASSWORD=你的密码 \
-  -v ./data:/app/data \
-  ghcr.io/fightroad/musicdl:latest
-```
-
 ## Docker
 
 直接使用已构建镜像：
@@ -83,6 +74,8 @@ docker run -d --name musicdl \
   ghcr.io/fightroad/musicdl:latest
 ```
 
+需要密码时加上 `-e AUTH_PASSWORD=你的密码`（compose 可在 `environment` 中配置）。
+
 打开 http://127.0.0.1:8000 。数据在 `./data`（音源配置与下载）。
 
 本地改代码构建：
@@ -95,8 +88,9 @@ docker run -d -p 8000:8000 -v ./data:/app/data musicdl:local
 ## 使用
 
 1. 打开「音源管理」，导入洛雪脚本（在线 URL 或本地 `.js`）
-2. 选择音源与平台，搜索歌曲
+2. 选择音源与平台，搜索歌曲（可点选联想词）
 3. 试听或下载；播放地址由音源脚本的 `musicUrl` 解析
+4. 在「音乐管理」查看、播放或删除已下载文件
 
 ### 对接 Navidrome
 
@@ -107,7 +101,8 @@ docker run -d -p 8000:8000 -v ./data:/app/data musicdl:local
 
 ## 说明
 
-- 搜索与歌词由本工具内置；取链依赖你导入的洛雪音源脚本
+- 搜索、联想与歌词由本工具内置；取链依赖你导入的洛雪音源脚本
+- 部分仅适配 LX 桌面（Electron）环境的音源，可能无法在本工具中取链
 - 音源配置保存在 `data/config/sources.json`
 - 仅监听本机时默认 `127.0.0.1`；容器内默认 `HOST=0.0.0.0`
 - 可选 `AUTH_PASSWORD` 开启单密码登录（见上文）
