@@ -1,6 +1,6 @@
 {
   "name": "musicdl",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "description": "Music search / preview / download shell with LX Music custom-source support",
   "type": "module",
