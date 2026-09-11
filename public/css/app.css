@@ -1117,11 +1117,19 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
   }
 
   /* Sources: card list on mobile */
+  .page-home.page-sources-active .wrap {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
   .page-home.page-sources-active .view-sources {
     overflow: auto;
     gap: 14px;
     padding-bottom: 8px;
     min-width: 0;
+    scrollbar-gutter: stable both-edges;
   }
   .page-home.page-sources-active .sources-list {
     flex: 0 0 auto;
