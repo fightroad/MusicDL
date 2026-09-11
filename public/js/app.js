@@ -841,6 +841,11 @@ function renderSuggest() {
       return `<li role="option"><button type="button" class="suggest-item${active}" data-tip-idx="${i}">${escapeHtml(tip)}</button></li>`
     })
     .join('')
+  if (suggestIndex >= 0) {
+    suggestListEl
+      .querySelector(`.suggest-item[data-tip-idx="${suggestIndex}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }
 }
 
 function applySuggest(tip) {
