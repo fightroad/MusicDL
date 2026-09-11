@@ -14,16 +14,17 @@ function renderDownloads(list) {
   if (downloadSummary) downloadSummary.textContent = `共 ${list.length} 首`
   if (!list.length) {
     downloadBody.innerHTML =
-      '<tr class="results-msg downloads-empty"><td colspan="4">暂无下载音乐</td></tr>'
+      '<tr class="results-msg downloads-empty"><td colspan="5">暂无下载音乐</td></tr>'
     return
   }
   downloadBody.innerHTML = list
-    .map((f) => {
+    .map((f, idx) => {
       const name = escapeHtml(f.filename)
       const size = escapeHtml(formatSize(f.size) || '-')
       const time = escapeHtml(formatDownloadTime(f.mtime))
       const key = encodeURIComponent(f.filename)
       return `<tr>
+        <td class="col-idx">${idx + 1}</td>
         <td class="col-file" title="${name}">
           <div class="dl-file-name">${name}</div>
           <div class="muted dl-file-meta">${size} · ${time}</div>
