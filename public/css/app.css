@@ -1132,7 +1132,8 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
     border-bottom: none;
   }
   #viewSearch tr:hover td,
-  #viewSources .sources-table tr:hover td {
+  #viewSources .sources-table tr:hover td,
+  #viewDownloads .downloads-table tr:hover td {
     background: transparent;
   }
   #viewSearch td {
