@@ -1180,6 +1180,9 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
     padding-top: 0;
     padding-bottom: 0;
   }
+  .suggest-list {
+    display: none !important;
+  }
 
   .platform-tabs {
     gap: 6px;

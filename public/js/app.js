@@ -813,6 +813,11 @@ let suggestTips = []
 let suggestIndex = -1
 let suggestTimer = null
 let suggestSeq = 0
+const suggestMq = window.matchMedia('(max-width: 720px)')
+
+function isSuggestEnabled() {
+  return !suggestMq.matches
+}
 
 function hideSuggest() {
   suggestTips = []
@@ -824,7 +829,7 @@ function hideSuggest() {
 }
 
 function renderSuggest() {
-  if (!suggestListEl) return
+  if (!suggestListEl || !isSuggestEnabled()) return
   if (!suggestTips.length) {
     hideSuggest()
     return
@@ -847,6 +852,10 @@ function applySuggest(tip) {
 }
 
 async function fetchSuggest() {
+  if (!isSuggestEnabled()) {
+    hideSuggest()
+    return
+  }
   const keyword = keywordInput.value.trim()
   if (!keyword) {
     hideSuggest()
@@ -871,8 +880,20 @@ async function fetchSuggest() {
 
 function scheduleSuggest() {
   clearTimeout(suggestTimer)
+  if (!isSuggestEnabled()) {
+    hideSuggest()
+    return
+  }
   suggestTimer = setTimeout(fetchSuggest, 280)
 }
+
+suggestMq.addEventListener('change', () => {
+  if (!isSuggestEnabled()) {
+    clearTimeout(suggestTimer)
+    suggestSeq += 1
+    hideSuggest()
+  }
+})
 
 keywordInput.addEventListener('input', () => {
   scheduleSuggest()
