@@ -1,11 +1,19 @@
 const downloadBody = document.getElementById('downloadBody')
 const downloadSummary = document.getElementById('downloadSummary')
+const btnRefreshDownloads = document.getElementById('btnRefreshDownloads')
+const downloadsTableWrap = document.querySelector('#viewDownloads .downloads-table')
 
 function formatDownloadTime(ms) {
   const d = new Date(ms)
   if (Number.isNaN(d.getTime())) return '-'
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function scrollDownloadsToTop() {
+  if (downloadsTableWrap) downloadsTableWrap.scrollTop = 0
+  const panel = document.getElementById('viewDownloads')
+  if (panel) panel.scrollTop = 0
 }
 
 function renderDownloads(list) {
@@ -41,15 +49,25 @@ function renderDownloads(list) {
     .join('')
 }
 
-async function loadDownloads() {
+async function loadDownloads({ scrollTop = false } = {}) {
   const data = await window.api('/api/music/files')
   renderDownloads(data.list || [])
+  if (scrollTop) scrollDownloadsToTop()
 }
 
 window.refreshDownloadList = () =>
   loadDownloads().catch((err) => {
     window.toast(err.message, { error: true })
   })
+
+btnRefreshDownloads?.addEventListener('click', async () => {
+  try {
+    await loadDownloads({ scrollTop: true })
+    window.toast('列表已刷新')
+  } catch (err) {
+    window.toast(err.message, { error: true })
+  }
+})
 
 downloadBody.addEventListener('click', async (e) => {
   const playBtn = e.target.closest('button[data-play-file]')

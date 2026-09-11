@@ -175,10 +175,21 @@ nav .nav-logout:hover {
   overflow: auto;
   border-radius: var(--radius);
 }
-.downloads-summary {
+.downloads-toolbar {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin: 0 0 10px;
+}
+.downloads-summary {
+  margin: 0;
   font-size: 0.9rem;
+}
+.downloads-toolbar .small {
+  flex: 0 0 auto;
+  margin-right: 0;
 }
 .downloads-table .col-file {
   width: 48%;

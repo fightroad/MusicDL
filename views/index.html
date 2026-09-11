@@ -141,7 +141,10 @@
 
   <main id="viewDownloads" class="wrap view-panel view-downloads" hidden>
     <section class="downloads-list">
-      <p class="downloads-summary muted" id="downloadSummary">共 0 首</p>
+      <div class="downloads-toolbar">
+        <p class="downloads-summary muted" id="downloadSummary">共 0 首</p>
+        <button type="button" class="small ghost" id="btnRefreshDownloads">刷新</button>
+      </div>
       <div class="table-wrap downloads-table">
         <table>
           <thead>
