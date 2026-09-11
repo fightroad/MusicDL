@@ -65,7 +65,6 @@ nav a {
   color: var(--muted);
   text-decoration: none;
   margin-left: 18px;
-  touch-action: manipulation;
 }
 nav a.active, nav a:hover { color: var(--accent); }
 .nav-label-short {
@@ -85,7 +84,6 @@ nav .nav-queue {
   align-items: center;
   gap: 6px;
   vertical-align: baseline;
-  touch-action: manipulation;
 }
 nav .nav-queue:hover,
 nav .nav-queue.is-open {
@@ -100,7 +98,6 @@ nav .nav-logout {
   font: inherit;
   font-weight: 400;
   cursor: pointer;
-  touch-action: manipulation;
 }
 nav .nav-logout:hover {
   color: var(--accent);
@@ -424,7 +421,6 @@ nav .nav-logout:hover {
 .pager select {
   margin: 0;
   padding: 3px 8px;
-  font-size: 0.82rem;
   height: 28px;
 }
 .pager button {
