@@ -14,7 +14,7 @@ function writeOut(payload) {
 async function main() {
   const script = fs.readFileSync(scriptPath, 'utf8')
   const request = JSON.parse(fs.readFileSync(reqPath, 'utf8'))
-  const runtime = createLxRuntime(script)
+  const runtime = await createLxRuntime(script)
   try {
     const url = await runtime.request(request)
     writeOut({

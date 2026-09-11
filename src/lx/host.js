@@ -202,8 +202,9 @@ function installExitGuard() {
 
 /**
  * Load and initialize an LX custom-source script (used inside child worker).
+ * Waits for async `inited` (many sources send it after version check / network).
  */
-export function createLxRuntime(script) {
+export async function createLxRuntime(script, { initTimeoutMs = 12000 } = {}) {
   installExitGuard()
   if (!script || !String(script).trim()) {
     throw new Error('脚本内容为空')
@@ -221,6 +222,10 @@ export function createLxRuntime(script) {
 
   let requestHandler = null
   let initedPayload = null
+  let settleInited = null
+  const initedWait = new Promise((resolve) => {
+    settleInited = resolve
+  })
 
   const wrappedRequest = (url, options = {}, callback) => {
     return lxRequest(url, options, callback)
@@ -244,6 +249,7 @@ export function createLxRuntime(script) {
     send(eventName, data) {
       if (eventName === EVENT_NAMES.inited || eventName === 'inited') {
         initedPayload = data || {}
+        if (settleInited) settleInited()
       }
     },
     request: wrappedRequest,
@@ -294,6 +300,22 @@ export function createLxRuntime(script) {
     setTimeout,
     clearTimeout
   )
+
+  if (!initedPayload) {
+    let timer = null
+    try {
+      await Promise.race([
+        initedWait,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            reject(new Error('音源脚本未发送 inited 事件（初始化失败）'))
+          }, Math.max(1000, Number(initTimeoutMs) || 12000))
+        }),
+      ])
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
+  }
 
   if (!initedPayload) {
     throw new Error('音源脚本未发送 inited 事件（初始化失败）')
