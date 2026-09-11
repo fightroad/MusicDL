@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Router } from 'express'
 import { DOWNLOAD_DIR, getSource } from '../db.js'
-import { embedDownloadMetaBuffer } from '../media/embedMeta.js'
+import { embedDownloadMetaBuffer, extractEmbeddedCover } from '../media/embedMeta.js'
 import {
   getSourcePlatformTabs,
   resolveWithSource,
@@ -251,6 +251,144 @@ router.get('/proxy', async (req, res) => {
     return res.end(buf)
   } catch (e) {
     res.status(e.status || 502).json({ detail: e.message || String(e) })
+  }
+})
+
+function listDownloadFiles() {
+  if (!fs.existsSync(DOWNLOAD_DIR)) return []
+  return fs
+    .readdirSync(DOWNLOAD_DIR)
+    .filter((name) => !name.endsWith('.partial'))
+    .map((filename) => {
+      const fullPath = path.join(DOWNLOAD_DIR, filename)
+      let st
+      try {
+        st = fs.statSync(fullPath)
+      } catch (_) {
+        return null
+      }
+      if (!st.isFile()) return null
+      return {
+        filename,
+        size: st.size,
+        mtime: st.mtimeMs,
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.mtime - a.mtime)
+}
+
+function resolveDownloadFile(filename) {
+  const raw = String(filename || '')
+  const base = path.basename(raw)
+  if (!base || base === '.' || base === '..' || base.endsWith('.partial') || /[/\\]/.test(raw)) {
+    const err = new Error('无效文件名')
+    err.status = 400
+    throw err
+  }
+  const fullPath = path.join(DOWNLOAD_DIR, base)
+  if (path.dirname(path.resolve(fullPath)) !== path.resolve(DOWNLOAD_DIR)) {
+    const err = new Error('无效文件名')
+    err.status = 400
+    throw err
+  }
+  return { filename: base, fullPath }
+}
+
+router.get('/files', (_req, res) => {
+  try {
+    res.json({ list: listDownloadFiles() })
+  } catch (e) {
+    res.status(e.status || 500).json({ detail: e.message || String(e) })
+  }
+})
+
+function contentTypeForFile(filename) {
+  const ext = path.extname(filename).toLowerCase()
+  if (ext === '.flac') return 'audio/flac'
+  if (ext === '.mp3') return 'audio/mpeg'
+  if (ext === '.m4a') return 'audio/mp4'
+  if (ext === '.ogg') return 'audio/ogg'
+  if (ext === '.wav') return 'audio/wav'
+  return 'application/octet-stream'
+}
+
+function streamLocalFile(req, res, fullPath, filename) {
+  const total = fs.statSync(fullPath).size
+  res.setHeader('Accept-Ranges', 'bytes')
+  res.setHeader('Content-Type', contentTypeForFile(filename))
+  res.setHeader('Cache-Control', 'private, max-age=3600')
+
+  const range = req.headers.range
+  let start = 0
+  let end = total - 1
+  if (range) {
+    const m = /^bytes=(\d+)-(\d*)$/.exec(range)
+    if (!m) {
+      res.setHeader('Content-Range', `bytes */${total}`)
+      return res.status(416).end()
+    }
+    start = Number(m[1])
+    end = m[2] ? Number(m[2]) : total - 1
+    if (Number.isNaN(start) || start >= total || end >= total || start > end) {
+      res.setHeader('Content-Range', `bytes */${total}`)
+      return res.status(416).end()
+    }
+    res.status(206)
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`)
+  }
+  res.setHeader('Content-Length', String(end - start + 1))
+  const stream = fs.createReadStream(fullPath, { start, end })
+  stream.on('error', () => {
+    if (!res.headersSent) res.status(500).end()
+    else res.destroy()
+  })
+  stream.pipe(res)
+}
+
+router.get('/files/:filename/cover', (req, res) => {
+  try {
+    const { fullPath } = resolveDownloadFile(decodeURIComponent(req.params.filename || ''))
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ detail: '文件不存在' })
+    }
+    const cover = extractEmbeddedCover(fullPath)
+    if (!cover) {
+      return res.status(404).json({ detail: '无封面' })
+    }
+    const st = fs.statSync(fullPath)
+    res.setHeader('Content-Type', cover.mime)
+    res.setHeader('Content-Length', String(cover.buf.length))
+    res.setHeader('Cache-Control', 'private, max-age=86400')
+    res.setHeader('Last-Modified', st.mtime.toUTCString())
+    res.end(cover.buf)
+  } catch (e) {
+    res.status(e.status || 500).json({ detail: e.message || String(e) })
+  }
+})
+
+router.get('/files/:filename', (req, res) => {
+  try {
+    const { filename, fullPath } = resolveDownloadFile(decodeURIComponent(req.params.filename || ''))
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ detail: '文件不存在' })
+    }
+    streamLocalFile(req, res, fullPath, filename)
+  } catch (e) {
+    res.status(e.status || 500).json({ detail: e.message || String(e) })
+  }
+})
+
+router.delete('/files/:filename', (req, res) => {
+  try {
+    const { filename, fullPath } = resolveDownloadFile(decodeURIComponent(req.params.filename || ''))
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ detail: '文件不存在' })
+    }
+    fs.unlinkSync(fullPath)
+    res.json({ ok: true, filename })
+  } catch (e) {
+    res.status(e.status || 500).json({ detail: e.message || String(e) })
   }
 })
 

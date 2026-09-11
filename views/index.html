@@ -16,11 +16,22 @@
     </a>
     <nav>
       <button type="button" id="dlQueueToggle" class="nav-link nav-queue" aria-expanded="false">
-        下载队列
+        <span class="nav-label-full">下载队列</span>
+        <span class="nav-label-short">队列</span>
         <span id="dlQueueBadge" class="dl-queue-badge" hidden>0</span>
       </button>
-      <a href="#search" data-view="search" class="nav-link active">音乐搜索</a>
-      <a href="#sources" data-view="sources" class="nav-link">音源管理</a>
+      <a href="#search" data-view="search" class="nav-link active">
+        <span class="nav-label-full">音乐搜索</span>
+        <span class="nav-label-short">搜索</span>
+      </a>
+      <a href="#downloads" data-view="downloads" class="nav-link">
+        <span class="nav-label-full">音乐管理</span>
+        <span class="nav-label-short">音乐</span>
+      </a>
+      <a href="#sources" data-view="sources" class="nav-link">
+        <span class="nav-label-full">音源管理</span>
+        <span class="nav-label-short">音源</span>
+      </a>
       <button type="button" id="btnLogout" class="nav-link nav-logout" hidden>退出</button>
     </nav>
   </header>
@@ -104,6 +115,24 @@
     </section>
   </main>
 
+  <main id="viewDownloads" class="wrap view-panel view-downloads" hidden>
+    <section class="downloads-list">
+      <div class="table-wrap downloads-table">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-file">文件</th>
+              <th class="col-size">大小</th>
+              <th class="col-time">时间</th>
+              <th class="col-actions">操作</th>
+            </tr>
+          </thead>
+          <tbody id="downloadBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
   <div id="dlModal" class="modal" hidden>
     <div class="modal-card">
       <button type="button" class="modal-close" id="dlClose" aria-label="关闭">×</button>
@@ -146,6 +175,7 @@
 
   <script src="/js/app.js"></script>
   <script src="/js/sources.js"></script>
+  <script src="/js/downloads.js"></script>
   <script src="/js/nav.js"></script>
 </body>
 </html>

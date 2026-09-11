@@ -371,10 +371,43 @@ async function playSong(song) {
   } catch (err) {
     setPlayerMeta(song, '试听失败')
     nowArtist.textContent = err.message
+    toast(`试听失败: ${err.message}`, { error: true })
     btnPlayPause.disabled = true
     seekBar.disabled = true
   }
 }
+
+function metaFromFilename(filename) {
+  const base = String(filename || '').replace(/\.[^.]+$/, '')
+  const idx = base.lastIndexOf(' - ')
+  if (idx > 0) {
+    return { name: base.slice(0, idx), artist: base.slice(idx + 3) }
+  }
+  return { name: base || '未知歌曲', artist: '本地文件' }
+}
+
+async function playLocalFile(filename) {
+  const song = metaFromFilename(filename)
+  song.cover = `/api/music/files/${encodeURIComponent(filename)}/cover`
+  setPlayerMeta(song, '加载中…')
+  btnPlayPause.disabled = true
+  seekBar.disabled = true
+  try {
+    audio.src = `/api/music/files/${encodeURIComponent(filename)}`
+    await audio.play()
+    setPlayerMeta(song)
+    btnPlayPause.disabled = false
+    seekBar.disabled = false
+    syncPlayButton()
+  } catch (err) {
+    setPlayerMeta(song, '播放失败')
+    nowArtist.textContent = err.message
+    toast(`播放失败: ${err.message}`, { error: true })
+    btnPlayPause.disabled = true
+    seekBar.disabled = true
+  }
+}
+window.playLocalFile = playLocalFile
 
 btnPlayPause.addEventListener('click', async () => {
   if (!audio.src) return
@@ -426,6 +459,7 @@ function formatSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`
   return `${(bytes / 1024 / 1024).toFixed(2)}MB`
 }
+window.formatSize = formatSize
 
 function estimateSize(durationSec, quality) {
   const kbps = QUALITY_BITRATE[quality] || 128
@@ -774,10 +808,10 @@ const btnLogout = document.getElementById('btnLogout')
 async function initAuthUi() {
   try {
     const status = await api('/api/auth/status')
-    if (status?.enabled) {
-      btnLogout.hidden = false
-    }
-  } catch (_) {}
+    btnLogout.hidden = !status?.enabled
+  } catch (_) {
+    btnLogout.hidden = true
+  }
 }
 
 btnLogout.addEventListener('click', async () => {

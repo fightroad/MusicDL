@@ -1,9 +1,11 @@
+import path from 'node:path'
 import NodeID3 from 'node-id3'
 import {
   FlacStream,
   MetadataBlockType,
   PictureBlock,
   VorbisCommentBlock,
+  readFlacTagsSync,
 } from 'flac-tagger'
 
 const COVER_MAX_BYTES = 2 * 1024 * 1024
@@ -39,6 +41,37 @@ async function fetchCoverBuffer(coverUrl) {
   const mime = sniffImageMime(buf, resp.headers.get('content-type'))
   if (!mime) return null
   return { buf, mime }
+}
+
+/**
+ * Read embedded front cover from a local mp3/flac file.
+ * @returns {{ buf: Buffer, mime: string } | null}
+ */
+export function extractEmbeddedCover(filePath) {
+  const ext = path.extname(filePath || '').toLowerCase()
+  try {
+    if (ext === '.mp3') {
+      const tags = NodeID3.read(filePath)
+      const img = tags?.image
+      const raw = img?.imageBuffer
+      if (!raw || !raw.length || raw.length > COVER_MAX_BYTES) return null
+      const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+      const mime = sniffImageMime(buf, img.mime) || 'image/jpeg'
+      return { buf, mime }
+    }
+    if (ext === '.flac') {
+      const tags = readFlacTagsSync(filePath)
+      const pic = tags?.picture
+      const raw = pic?.buffer
+      if (!raw || !raw.length || raw.length > COVER_MAX_BYTES) return null
+      const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+      const mime = sniffImageMime(buf, pic.mime) || 'image/jpeg'
+      return { buf, mime }
+    }
+  } catch (err) {
+    console.warn('[extractCover]', err?.message || err)
+  }
+  return null
 }
 
 function writeFlacTagsToBuffer(tags, sourceBuffer) {

@@ -40,6 +40,10 @@ app.get('/sources', (_req, res) => {
   res.redirect('/#sources')
 })
 
+app.get('/downloads', (_req, res) => {
+  res.redirect('/#downloads')
+})
+
 app.use('/api/sources', sourcesRouter)
 app.use('/api/music', musicRouter)
 
