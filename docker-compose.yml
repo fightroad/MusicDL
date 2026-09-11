@@ -1,6 +1,8 @@
 services:
   musicdl:
     image: ghcr.io/fightroad/musicdl:latest
+    container_name: musicdl
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
@@ -8,4 +10,3 @@ services:
       PORT: 8000
     volumes:
       - ./data:/app/data
-    restart: unless-stopped
