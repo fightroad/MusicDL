@@ -1101,8 +1101,9 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
   #viewSearch td.col-actions .small {
     flex: 1;
     margin-right: 0;
-    min-height: 40px;
-    padding: 8px 12px;
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
   }
   .song-sub {
     display: block;
@@ -1206,14 +1207,16 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
     grid-row: 1;
     padding-top: 2px;
   }
-  #viewSources .sources-table td.col-version,
-  #viewSources .sources-table td.col-author {
+  #viewSources .sources-table td.col-version {
     display: block;
     grid-column: 2 / -1;
     color: var(--muted);
     font-size: 0.8rem;
     line-height: 1.4;
     word-break: break-all;
+  }
+  #viewSources .sources-table td.col-author {
+    display: none;
   }
   #viewSources .sources-table td.col-actions {
     display: flex;
@@ -1225,8 +1228,9 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
     flex: 1;
     margin-right: 0;
     margin-bottom: 0;
-    min-height: 40px;
-    padding: 8px 12px;
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
   }
   .source-name {
     white-space: normal;
