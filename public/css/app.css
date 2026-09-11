@@ -537,6 +537,19 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dl-queue-meta.is-queued,
+.dl-queue-meta.is-cancelled {
+  color: var(--muted);
+}
+.dl-queue-meta.is-running {
+  color: var(--accent);
+}
+.dl-queue-meta.is-done {
+  color: var(--accent-2);
+}
+.dl-queue-meta.is-skipped {
+  color: #e0b35a;
+}
 .dl-queue-meta.is-error {
   color: var(--danger);
 }
@@ -630,6 +643,13 @@ tr:hover td { background: rgba(255, 255, 255, 0.03); }
 }
 .results-msg:hover td {
   background: transparent;
+}
+.results-msg-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+.results-msg-link:hover {
+  text-decoration: underline;
 }
 .col-idx {
   width: 52px;

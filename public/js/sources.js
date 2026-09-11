@@ -2,11 +2,21 @@ const form = document.getElementById('importForm')
 const body = document.getElementById('sourceBody')
 const fileInput = document.getElementById('scriptFile')
 const urlInput = document.getElementById('scriptUrl')
+const importBtn = form.querySelector('button[type="submit"]')
 
 let sourcesList = []
+let importing = false
 
 function clearForm() {
   form.reset()
+}
+
+function setImportBusy(busy) {
+  importing = busy
+  importBtn.disabled = busy
+  urlInput.disabled = busy
+  fileInput.disabled = busy
+  importBtn.textContent = busy ? '导入中…' : '导入'
 }
 
 function notifySearchSources() {
@@ -77,15 +87,16 @@ window.refreshSourceList = () =>
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault()
+  if (importing) return
   const url = urlInput.value.trim()
   const file = fileInput.files && fileInput.files[0]
-  let script = null
-  if (file) script = await file.text()
-  if (!url && !script) {
+  if (!url && !file) {
     window.toast('请填写脚本 URL，或选择本地 .js 文件', { error: true })
     return
   }
+  setImportBusy(true)
   try {
+    const script = file ? await file.text() : null
     const item = await window.api('/api/sources/import', {
       method: 'POST',
       body: JSON.stringify({ url: url || null, script: script || null }),
@@ -96,6 +107,8 @@ form.addEventListener('submit', async (e) => {
     notifySearchSources()
   } catch (err) {
     window.toast(`导入失败: ${err.message}`, { error: true, ms: 3200 })
+  } finally {
+    setImportBusy(false)
   }
 })
 

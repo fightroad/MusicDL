@@ -184,6 +184,7 @@ async function loadSources() {
     sourceSelect.innerHTML = '<option value="">请先导入音源</option>'
     renderPlatformTabs([])
     pagerEl.hidden = true
+    renderNoSourcesMessage()
     return
   }
   sourceSelect.innerHTML = sourcesCache
@@ -193,6 +194,10 @@ async function loadSources() {
     sourceSelect.value = prev
   }
   await loadPlatformTabs()
+  if (resultBody.querySelector('.results-msg-nosource')) {
+    hasSearched = false
+    renderResultsMessage('输入关键词后点击搜索')
+  }
 }
 
 function formatDuration(sec) {
@@ -210,6 +215,12 @@ function setSearchBusy(busy) {
 
 function renderResultsMessage(text) {
   resultBody.innerHTML = `<tr class="results-msg"><td colspan="6">${escapeHtml(text)}</td></tr>`
+}
+
+function renderNoSourcesMessage() {
+  hasSearched = false
+  resultBody.innerHTML =
+    '<tr class="results-msg results-msg-nosource"><td colspan="6">暂无可用音源，请先导入 · <a href="#sources" class="results-msg-link">去音源管理</a></td></tr>'
 }
 
 function renderRows(songs) {
@@ -251,6 +262,7 @@ async function doSearch({ resetPage = false } = {}) {
   const keyword = keywordInput.value.trim()
   const sourceId = Number(sourceSelect.value)
   if (!sourceId) {
+    renderNoSourcesMessage()
     toast('请先导入并选择音源', { error: true })
     return
   }
@@ -526,12 +538,21 @@ function renderDlQueue() {
     dlQueueBadge.hidden = true
   }
 
+  const statusClass = {
+    queued: 'is-queued',
+    running: 'is-running',
+    done: 'is-done',
+    skipped: 'is-skipped',
+    cancelled: 'is-cancelled',
+    error: 'is-error',
+  }
+
   dlQueueEmpty.hidden = hasJobs
   dlQueueList.innerHTML = dlJobs
     .map((job) => {
       const name = escapeHtml(job.song.name || '未知歌曲')
       const artist = escapeHtml(job.song.artist || '')
-      const metaClass = job.status === 'error' ? 'dl-queue-meta is-error' : 'dl-queue-meta'
+      const metaClass = `dl-queue-meta ${statusClass[job.status] || 'is-error'}`
       const meta = escapeHtml(dlJobLabel(job))
       let actions = ''
       if (job.status === 'queued') {
@@ -706,10 +727,16 @@ sourceSelect.addEventListener('change', async () => {
   currentPlatform = ''
   currentPage = 1
   totalItems = 0
-  resultBody.innerHTML = ''
+  hasSearched = false
   renderPager()
   await loadPlatformTabs()
-  if (keywordInput.value.trim()) doSearch({ resetPage: true })
+  if (keywordInput.value.trim()) {
+    doSearch({ resetPage: true })
+  } else if (!Number(sourceSelect.value)) {
+    renderNoSourcesMessage()
+  } else {
+    renderResultsMessage('输入关键词后点击搜索')
+  }
 })
 
 btnPrev.addEventListener('click', () => {
