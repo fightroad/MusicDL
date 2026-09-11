@@ -175,6 +175,11 @@ nav .nav-logout:hover {
   overflow: auto;
   border-radius: var(--radius);
 }
+.downloads-summary {
+  flex: 0 0 auto;
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+}
 .downloads-table .col-file {
   width: 52%;
 }

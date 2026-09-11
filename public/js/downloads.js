@@ -1,4 +1,5 @@
 const downloadBody = document.getElementById('downloadBody')
+const downloadSummary = document.getElementById('downloadSummary')
 
 function formatDownloadTime(ms) {
   const d = new Date(ms)
@@ -10,6 +11,7 @@ function formatDownloadTime(ms) {
 function renderDownloads(list) {
   const escapeHtml = window.escapeHtml
   const formatSize = window.formatSize
+  if (downloadSummary) downloadSummary.textContent = `共 ${list.length} 首`
   if (!list.length) {
     downloadBody.innerHTML =
       '<tr class="results-msg downloads-empty"><td colspan="4">暂无下载音乐</td></tr>'
