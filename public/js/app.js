@@ -626,6 +626,9 @@ function enqueueDownload(song, quality = '128k') {
   renderDlQueue()
   pumpDlQueue()
   closeDownloadModal()
+  const qLabel = QUALITY_LABELS[q] || q
+  const name = song?.name || '未知歌曲'
+  toast(`已加入下载队列：${name} · ${qLabel}`)
 }
 
 function pumpDlQueue() {
