@@ -823,6 +823,8 @@ function isSuggestEnabled() {
 }
 
 function hideSuggest() {
+  clearTimeout(suggestTimer)
+  suggestSeq += 1
   suggestTips = []
   suggestIndex = -1
   if (suggestListEl) {
@@ -896,11 +898,7 @@ function scheduleSuggest() {
 }
 
 suggestMq.addEventListener('change', () => {
-  if (!isSuggestEnabled()) {
-    clearTimeout(suggestTimer)
-    suggestSeq += 1
-    hideSuggest()
-  }
+  if (!isSuggestEnabled()) hideSuggest()
 })
 
 keywordInput.addEventListener('input', () => {

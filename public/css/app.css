@@ -422,6 +422,7 @@ nav .nav-logout:hover {
   margin: 0;
   padding: 3px 8px;
   height: 28px;
+  background-image: none;
 }
 .pager button {
   padding: 3px 10px;
