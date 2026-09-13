@@ -3,9 +3,21 @@ const body = document.getElementById('sourceBody')
 const fileInput = document.getElementById('scriptFile')
 const urlInput = document.getElementById('scriptUrl')
 const importBtn = form.querySelector('button[type="submit"]')
+const btnFetchBundle = document.getElementById('btnFetchBundle')
+const bundleModal = document.getElementById('bundleModal')
+const bundleTitle = document.getElementById('bundleTitle')
+const bundleSub = document.getElementById('bundleSub')
+const bundleList = document.getElementById('bundleList')
+const bundleStatus = document.getElementById('bundleStatus')
+const bundleCount = document.getElementById('bundleCount')
+const bundleCheckAll = document.getElementById('bundleCheckAll')
+const bundleImport = document.getElementById('bundleImport')
+const bundleCancel = document.getElementById('bundleCancel')
+const bundleClose = document.getElementById('bundleClose')
 
 let sourcesList = []
 let importing = false
+let bundleBusy = false
 
 function clearForm() {
   form.reset()
@@ -16,7 +28,17 @@ function setImportBusy(busy) {
   importBtn.disabled = busy
   urlInput.disabled = busy
   fileInput.disabled = busy
+  if (btnFetchBundle) btnFetchBundle.disabled = busy || bundleBusy
   importBtn.textContent = busy ? '导入中…' : '导入'
+}
+
+function setBundleBusy(busy) {
+  bundleBusy = busy
+  if (btnFetchBundle) {
+    btnFetchBundle.disabled = busy || importing
+    btnFetchBundle.textContent = busy ? '拉取中…' : '拉取最新音源包'
+  }
+  if (bundleImport) bundleImport.disabled = busy
 }
 
 function notifySearchSources() {
@@ -84,6 +106,150 @@ window.refreshSourceList = () =>
   loadList().catch((err) => {
     window.toast(err.message, { error: true })
   })
+
+function selectedBundleKeys() {
+  return [...bundleList.querySelectorAll('input[data-bundle-key]:checked')].map(
+    (el) => el.dataset.bundleKey
+  )
+}
+
+function syncBundleCheckAll() {
+  const boxes = [...bundleList.querySelectorAll('input[data-bundle-key]')]
+  if (!boxes.length) {
+    bundleCheckAll.checked = false
+    bundleCheckAll.indeterminate = false
+    bundleCount.textContent = ''
+    return
+  }
+  const checked = boxes.filter((b) => b.checked).length
+  bundleCheckAll.checked = checked === boxes.length
+  bundleCheckAll.indeterminate = checked > 0 && checked < boxes.length
+  bundleCount.textContent = `已选 ${checked} / ${boxes.length}`
+}
+
+function renderBundleList(scripts) {
+  const escapeHtml = window.escapeHtml
+  const list = scripts || []
+  if (!list.length) {
+    bundleList.innerHTML =
+      '<li class="bundle-item"><div class="muted">包内没有可识别的音源脚本</div></li>'
+    syncBundleCheckAll()
+    return
+  }
+  bundleList.innerHTML = list
+    .map((s) => {
+      const ver = s.version || '-'
+      const author = s.author || '-'
+      let badge = `<span class="bundle-badge is-new">未导入</span>`
+      if (s.updateAvailable) {
+        badge = `<span class="bundle-badge is-update">可更新</span>`
+      } else if (s.imported) {
+        badge = `<span class="bundle-badge is-old">已导入</span>`
+      }
+      return `<li class="bundle-item">
+        <input type="checkbox" data-bundle-key="${escapeHtml(s.key)}" />
+        <div class="bundle-item-main">
+          <div class="bundle-item-head">
+            <div class="bundle-item-name">${escapeHtml(s.name)}</div>
+            ${badge}
+          </div>
+          <div class="bundle-item-meta">${escapeHtml(ver)} · ${escapeHtml(author)}</div>
+        </div>
+      </li>`
+    })
+    .join('')
+  syncBundleCheckAll()
+}
+
+function openBundleModal(data) {
+  bundleTitle.textContent = '最新音源包'
+  const when = data.publishedAt ? new Date(data.publishedAt).toLocaleString() : ''
+  bundleSub.textContent = [data.tag ? `版本 ${data.tag}` : '', when].filter(Boolean).join(' · ')
+  bundleStatus.textContent = ''
+  renderBundleList(data.scripts || [])
+  bundleModal.hidden = false
+}
+
+function closeBundleModal() {
+  bundleModal.hidden = true
+  bundleStatus.textContent = ''
+}
+
+btnFetchBundle?.addEventListener('click', async () => {
+  if (bundleBusy || importing) return
+  setBundleBusy(true)
+  try {
+    const data = await window.api('/api/sources/bundle/latest?force=1')
+    openBundleModal(data)
+  } catch (err) {
+    window.toast(`拉取失败: ${err.message}`, { error: true, ms: 3600 })
+  } finally {
+    setBundleBusy(false)
+  }
+})
+
+bundleCheckAll?.addEventListener('change', () => {
+  const on = bundleCheckAll.checked
+  bundleList.querySelectorAll('input[data-bundle-key]').forEach((el) => {
+    el.checked = on
+  })
+  syncBundleCheckAll()
+})
+
+bundleList?.addEventListener('change', (e) => {
+  if (e.target.matches('input[data-bundle-key]')) syncBundleCheckAll()
+})
+
+bundleList?.addEventListener('click', (e) => {
+  const item = e.target.closest('.bundle-item')
+  if (!item || e.target.matches('input')) return
+  const box = item.querySelector('input[data-bundle-key]')
+  if (!box) return
+  box.checked = !box.checked
+  syncBundleCheckAll()
+})
+
+bundleImport?.addEventListener('click', async () => {
+  const keys = selectedBundleKeys()
+  if (!keys.length) {
+    window.toast('请先勾选要导入的音源', { error: true })
+    return
+  }
+  setBundleBusy(true)
+  bundleStatus.textContent = `正在导入 ${keys.length} 个音源…`
+  try {
+    const result = await window.api('/api/sources/bundle/import', {
+      method: 'POST',
+      body: JSON.stringify({ keys }),
+    })
+    const ok = result.importedCount || 0
+    const fail = result.failedCount || 0
+    if (ok) {
+      window.toast(fail ? `已导入 ${ok} 个，失败 ${fail} 个` : `已导入 ${ok} 个音源`)
+      await loadList()
+      notifySearchSources()
+      closeBundleModal()
+    } else {
+      const msg = result.failed?.[0]?.error || '导入失败'
+      bundleStatus.textContent = msg
+      window.toast(msg, { error: true })
+    }
+  } catch (err) {
+    bundleStatus.textContent = err.message
+    window.toast(`导入失败: ${err.message}`, { error: true, ms: 3200 })
+  } finally {
+    setBundleBusy(false)
+  }
+})
+
+bundleCancel?.addEventListener('click', closeBundleModal)
+bundleClose?.addEventListener('click', closeBundleModal)
+bundleModal?.addEventListener('click', (e) => {
+  if (e.target === bundleModal) closeBundleModal()
+})
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && bundleModal && !bundleModal.hidden) closeBundleModal()
+})
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault()

@@ -108,6 +108,7 @@
           </label>
           <div class="actions">
             <button type="submit">导入</button>
+            <button type="button" id="btnFetchBundle" class="ghost">拉取最新音源包</button>
           </div>
         </form>
       </div>
@@ -177,6 +178,24 @@
       <div class="modal-sub" id="dlArtist">歌手</div>
       <div class="modal-actions" id="dlQualities"></div>
       <p class="modal-status" id="dlStatus"></p>
+    </div>
+  </div>
+
+  <div id="bundleModal" class="modal" hidden>
+    <div class="modal-card bundle-modal-card">
+      <button type="button" class="modal-close" id="bundleClose" aria-label="关闭">×</button>
+      <div class="modal-title" id="bundleTitle">最新音源包</div>
+      <div class="modal-sub" id="bundleSub"></div>
+      <div class="bundle-toolbar">
+        <label class="bundle-check-all"><input type="checkbox" id="bundleCheckAll" /> 全选</label>
+        <span class="bundle-count" id="bundleCount"></span>
+      </div>
+      <ul id="bundleList" class="bundle-list"></ul>
+      <p class="modal-status" id="bundleStatus"></p>
+      <div class="bundle-actions">
+        <button type="button" class="ghost" id="bundleCancel">取消</button>
+        <button type="button" id="bundleImport">导入所选</button>
+      </div>
     </div>
   </div>
 

@@ -8,5 +8,8 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 8000
+      # AUTH_PASSWORD: your-password    # optional, enable login gate
+      # GITHUB_TOKEN: ghp_xxx          # optional, higher GitHub API rate limit
+      # LX_BUNDLE_REPO: owner/repo     # optional, default guoyue2010/lxmusic-
     volumes:
       - ./data:/app/data

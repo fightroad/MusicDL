@@ -12,6 +12,7 @@
     "dev": "node --watch src/index.js"
   },
   "dependencies": {
+    "adm-zip": "^0.6.1",
     "express": "^5.1.0",
     "flac-tagger": "^2.0.0",
     "node-id3": "^0.2.9"

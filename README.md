@@ -24,7 +24,7 @@
 
 ## 功能
 
-- 导入洛雪兼容自定义音源（URL 或本地 `.js`）
+- 导入洛雪兼容自定义音源（URL、本地 `.js`，或拉取最新音源包勾选导入）
 - 按平台搜索（酷我 / 酷狗 / QQ / 网易云 / 咪咕），输入时可联想提示
 - 试听、按音质下载；下载队列；MP3/FLAC 可写入封面与歌词
 - 音乐管理：本地已下载列表、播放与删除
@@ -96,7 +96,7 @@ docker run -d -p 8000:8000 -v ./data:/app/data musicdl:local
 
 ## 使用
 
-1. 打开「音源管理」，导入洛雪脚本（在线 URL 或本地 `.js`）
+1. 打开「音源管理」，导入洛雪脚本（在线 URL、本地 `.js`，或「拉取最新音源包」）
 2. 选择音源与平台，搜索歌曲（可点选联想词）
 3. 试听或下载；播放地址由音源脚本的 `musicUrl` 解析
 4. 在「音乐管理」查看、播放或删除已下载文件
@@ -115,3 +115,5 @@ docker run -d -p 8000:8000 -v ./data:/app/data musicdl:local
 - 音源配置保存在 `data/config/sources.json`
 - 仅监听本机时默认 `127.0.0.1`；容器内默认 `HOST=0.0.0.0`
 - 可选 `AUTH_PASSWORD` 开启单密码登录（见上文）
+- 可选 `GITHUB_TOKEN`（或 `GH_TOKEN`）：拉取音源包时提高 GitHub API 限额
+- 可选 `LX_BUNDLE_REPO`：音源包仓库，默认 `guoyue2010/lxmusic-`（`owner/repo` 格式）

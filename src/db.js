@@ -125,7 +125,10 @@ export function upsertLxSource({
 }) {
   const store = readStore()
   const stamp = nowIso()
-  const idx = store.sources.findIndex((s) => s.name === name)
+  const nameKey = String(name || '').trim().toLowerCase()
+  const idx = store.sources.findIndex(
+    (s) => String(s.name || '').trim().toLowerCase() === nameKey
+  )
 
   // LX-aligned: persist header + script only (no platforms/qualitys on disk)
   const base = {
@@ -144,7 +147,7 @@ export function upsertLxSource({
     const prev = store.sources[idx]
     store.sources[idx] = {
       id: prev.id,
-      name,
+      name: prev.name || name,
       sort_order: prev.sort_order,
       created_at: prev.created_at,
       ...base,

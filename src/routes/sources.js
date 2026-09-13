@@ -9,6 +9,7 @@ import {
   toPublicSource,
   upsertLxSource,
 } from '../db.js'
+import { fetchLatestBundle, importBundleScripts } from '../sources/lxBundle.js'
 
 const router = Router()
 
@@ -22,6 +23,25 @@ router.put('/reorder', (req, res) => {
     res.json(list.map(toPublicSource))
   } catch (e) {
     res.status(400).json({ detail: e.message || String(e) })
+  }
+})
+
+router.get('/bundle/latest', async (req, res) => {
+  try {
+    const force = String(req.query.force || '') === '1'
+    const data = await fetchLatestBundle({ force })
+    res.json(data)
+  } catch (e) {
+    res.status(e.status || 502).json({ detail: e.message || String(e) })
+  }
+})
+
+router.post('/bundle/import', (req, res) => {
+  try {
+    const result = importBundleScripts(req.body?.keys)
+    res.json(result)
+  } catch (e) {
+    res.status(e.status || 400).json({ detail: e.message || String(e) })
   }
 })
 
