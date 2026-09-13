@@ -7,7 +7,7 @@ import { dropRuntime, parseLxMeta } from '../lx/host.js'
 import { listSources, upsertLxSource, toPublicSource } from '../db.js'
 
 const DEFAULT_REPO = 'guoyue2010/lxmusic-'
-const UA = 'MusicDL/0.3 (https://github.com/fightroad/MusicDL)'
+const UA = 'MusicDL/0.4 (https://github.com/fightroad/MusicDL)'
 
 /** @type {{ tag: string, publishedAt: string|null, scripts: Map<string, object>, fetchedAt: number } | null} */
 let bundleCache = null
